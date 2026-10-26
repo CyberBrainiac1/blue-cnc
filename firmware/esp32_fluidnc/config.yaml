@@ -1,0 +1,105 @@
+# FluidNC config for the blue desktop CNC (JP-3163B "JIPING V3.9" TB6560 board),
+# driven from a plain ESP32 DevKit wired straight to the box's DB25 port.
+#
+# Pins (see ../README.md for the diagram):
+#   DB25 2/3 = X step/dir <- GPIO 32/33
+#   DB25 4/5 = Y step/dir <- GPIO 25/26
+#   DB25 6/7 = Z step/dir <- GPIO 27/13
+#   DB25 18  = ground     <- GND
+#
+# Key names checked against FluidNC's official example configs
+# (github.com/bdring/fluidnc-config-files) and its source (pulse_us 0-30, dir_delay_us 0-10).
+#
+# PLACEHOLDERS: steps_per_mm, speeds, acceleration and travel are not calibrated yet.
+# They match GRBL's defaults, so moves are slow and distances are NOT real mm.
+# Update them after calibration.
+
+name: "Blue desktop CNC (JP-3163B)"
+board: "ESP32 DevKit, direct to DB25"
+
+stepping:
+  engine: RMT
+  idle_ms: 255          # motors stay energised; the box's enable isn't wired anyway
+  pulse_us: 20          # long pulses for the slow 4N26 optocouplers (20 us worked on the Nano)
+  dir_delay_us: 10      # direction setup time before a step, the maximum FluidNC allows
+  disable_delay_us: 0
+
+axes:
+  shared_stepper_disable_pin: NO_PIN
+
+  x:
+    steps_per_mm: 250.000           # placeholder
+    max_rate_mm_per_min: 500.000    # placeholder
+    acceleration_mm_per_sec2: 10.000
+    max_travel_mm: 200.000
+    soft_limits: false
+    motor0:
+      limit_neg_pin: NO_PIN
+      limit_pos_pin: NO_PIN
+      limit_all_pin: NO_PIN
+      hard_limits: false
+      standard_stepper:
+        step_pin: gpio.32:low       # idle HIGH, pulse LOW, as on the Nano ($2=7)
+        direction_pin: gpio.33      # add :low here if X moves the wrong way
+        disable_pin: NO_PIN
+
+  y:
+    steps_per_mm: 250.000
+    max_rate_mm_per_min: 500.000
+    acceleration_mm_per_sec2: 10.000
+    max_travel_mm: 200.000
+    soft_limits: false
+    motor0:
+      limit_neg_pin: NO_PIN
+      limit_pos_pin: NO_PIN
+      limit_all_pin: NO_PIN
+      hard_limits: false
+      standard_stepper:
+        step_pin: gpio.25:low
+        direction_pin: gpio.26
+        disable_pin: NO_PIN
+
+  z:
+    steps_per_mm: 250.000
+    max_rate_mm_per_min: 500.000
+    acceleration_mm_per_sec2: 10.000
+    max_travel_mm: 80.000
+    soft_limits: false
+    motor0:
+      limit_neg_pin: NO_PIN
+      limit_pos_pin: NO_PIN
+      limit_all_pin: NO_PIN
+      hard_limits: false
+      standard_stepper:
+        step_pin: gpio.27:low
+        direction_pin: gpio.13
+        disable_pin: NO_PIN
+
+control:
+  safety_door_pin: NO_PIN
+  reset_pin: NO_PIN
+  feed_hold_pin: NO_PIN
+  cycle_start_pin: NO_PIN
+
+coolant:
+  flood_pin: NO_PIN
+  mist_pin: NO_PIN
+
+start:
+  must_home: false      # no limit switches, so no homing; set zero by hand
+
+# No spindle section: FluidNC then uses "NoSpindle", and the spindle stays on the
+# VFD keypad, as planned. When the spindle gets wired (DB25 1 relay, DB25 17 0-10V,
+# both still unverified), this block is the starting point:
+#
+# PWM:
+#   pwm_hz: 5000
+#   output_pin: gpio.21     # -> DB25 17, spindle speed
+#   enable_pin: gpio.4      # -> DB25 1, spindle relay
+#   direction_pin: NO_PIN
+#   disable_with_s0: false
+#   s0_with_disable: true
+#   spinup_ms: 3000
+#   spindown_ms: 3000
+#   tool_num: 0
+#   speed_map: 0=0% 24000=100%
