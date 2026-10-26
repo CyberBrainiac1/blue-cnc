@@ -14,7 +14,12 @@ const PIN_LEN = 18.6;
 // locating features on round parts of the machine (tight: 0.1 per side)
 const X_ROD_Y = 281.19; const X_ROD_Z = 327.61;  // upper 20 mm X rod end, against the right side plate
 const X_ROD_R = 10.0 + 0.1;
-const ROD_X0 = 2.0;                              // X carriage bearings stop at x -1.8 when the switch trips
+const ROD_X0 = 2.0;                              // cradle's inner face (right-side frame)
+// The X bracket goes on the LEFT gantry side plate (homes to -X). It is drawn in the right-side
+// frame and mirrored about x = X_MIRROR, 0.19 mm higher (the model is very slightly tilted).
+const X_MIRROR = -241.76; const X_LEFT_DZ = 0.19;
+const SWX = -4.5;                                // switch 4.5 mm toward the carriage: trips at about -62, about 6 mm
+                                                 // before the carriage's lower plate reaches the left side plate (-69.4)
 const Z_HEAD_X = -324.28; const Z_HEAD_Y = 228.19;  // M5 socket head holding the top of the Z rod
 const Z_HEAD_R = 4.25 + 0.1;
 
@@ -141,19 +146,19 @@ const M4_NUT_H = 5.3;
 
 function mountX(context is Context, id is Id, showSwitches is boolean)
 {
-    // ---- X: saddle on the top edge of the right gantry side plate
+    // ---- X: saddle on the top edge of the gantry side plate, drawn on the right and mirrored to the left
         const y0 = 260.5; const y1 = 291.9; const ym = (y0 + y1) / 2;
         const xIn = 11.19; const xOut = 23.29; const zTop = 347.61;
-        const f = switchFrame(vec3(9.5, ym, 360.2 + SW_T / 2), vec3(-1, 0, 0), vec3(0, 1, 0));
+        const f = switchFrame(vec3(9.5 + SWX, ym, 360.2 + SW_T / 2), vec3(-1, 0, 0), vec3(0, 1, 0));
         makeMount(context, id + "X", [
-                    function(c, i) { bx(c, i, 9.0, 26.6, y0, y1, zTop, 350.6); },
+                    function(c, i) { bx(c, i, ROD_X0, 26.6, y0, y1, zTop, 350.6); },
                     function(c, i) { bx(c, i, 9.0, xIn - GAP, y0, y1, 343.6, zTop); },
                     function(c, i) { bx(c, i, xOut + GAP, 26.6, y0, y1, 330.0, zTop); },
                     function(c, i) { bx(c, i, 26.6, 32.0, y0, y1, 330.0, 345.0); },
-                    function(c, i) { bx(c, i, 9.5, 20.0, y0, y1, 350.6, 360.2); },
-                    function(c, i) { bx(c, i, 9.5, 21.5, y0, ym - SNUG_HALF, 360.2, 374.8); },
-                    function(c, i) { bx(c, i, 9.5, 21.5, ym + SNUG_HALF, y1, 360.2, 374.8); },
-                    function(c, i) { bx(c, i, 10.0, 21.5, y0, y1, 366.8, 374.8); },
+                    function(c, i) { bx(c, i, 9.5 + SWX, 20.0 + SWX, y0, y1, 350.6, 360.2); },
+                    function(c, i) { bx(c, i, 9.5 + SWX, 21.5 + SWX, y0, ym - SNUG_HALF, 360.2, 374.8); },
+                    function(c, i) { bx(c, i, 9.5 + SWX, 21.5 + SWX, ym + SNUG_HALF, y1, 360.2, 374.8); },
+                    function(c, i) { bx(c, i, 10.0 + SWX, 21.5 + SWX, y0, y1, 366.8, 374.8); },
                     // rod cradle over the end of the upper X rod (top and front side, back cut at 45 deg)
                     function(c, i) { bx(c, i, ROD_X0, xIn - GAP, y0, y1, X_ROD_Z, zTop); },
                     function(c, i) { bx(c, i, ROD_X0, xIn - GAP, y0, X_ROD_Y - X_ROD_R, X_ROD_Z - 6.0, X_ROD_Z); }],
@@ -161,8 +166,8 @@ function mountX(context is Context, id is Id, showSwitches is boolean)
                     function(c, i) { bx(c, i, ROD_X0 - 0.5, xIn, X_ROD_Y, y1 + 0.5, X_ROD_Z - 7.0, X_ROD_Z + 7.2); },
                     function(c, i) { cy(c, i, vec3(xOut + GAP, ym, 337.5), vec3(1, 0, 0), 0, 9.0, M4_CLEAR); },
                     function(c, i) { nutTrap(c, i, vec3(27.15, ym, 337.5), vec3(1, 0, 0), vec3(0, 0, -1), M4_NUT_AF, M4_NUT_H, 8.0); },
-                    function(c, i) { cy(c, i, vec3(13.0, ym, 366.8), vec3(0, 0, 1), 0, 8.5, M3_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3(13.0, ym, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), M3_NUT_AF, M3_NUT_H, 6.0); },
+                    function(c, i) { cy(c, i, vec3(13.0 + SWX, ym, 366.8), vec3(0, 0, 1), 0, 8.5, M3_CLEAR); },
+                    function(c, i) { nutTrap(c, i, vec3(13.0 + SWX, ym, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), M3_NUT_AF, M3_NUT_H, 6.0); },
                     function(c, i) { cy(c, i, vec3(f.holes[0][0], f.holes[0][1], 366.6), vec3(0, 0, 1), 0, 8.5, PIN_ACCESS); },
                     function(c, i) { cy(c, i, vec3(f.holes[1][0], f.holes[1][1], 366.6), vec3(0, 0, 1), 0, 8.5, PIN_ACCESS); },
                     function(c, i) { cy(c, i, vec3(f.holes[0][0], f.holes[0][1], 360.2), vec3(0, 0, -1), 0, 4.0, PIN_HOLE); },
@@ -173,26 +178,44 @@ function mountX(context is Context, id is Id, showSwitches is boolean)
 
 function mountY(context is Context, id is Id, showSwitches is boolean)
 {
-    // ---- Y: C-clip in the front groove of the back end plate, right end
-        const yFront = 319.09; const yFloor = 325.09; const yBack = 339.09;
-        const g0 = 54.87; const g1 = 76.87; const xEnd = -1.82; const zb = g0 + 0.4;
-        const f = switchFrame(vec3(14.0 + SW_T / 2, 317.0, 79.0), vec3(0, -1, 0), vec3(0, 0, 1));
+    // ---- Y: two-piece clamp on the back end of the right Y rail (SBR16), against the back end plate.
+    // Body drops over the rail (arch on the shaft, leg past the left edge of the support);
+    // the jaw on the right edge of the support is pulled in by one M4 x 16.
+        const y0 = 298.99; const y1 = 318.99;             // y0 = lever face, rear bearing block back face at y -16.4
+        const xOut = -60.42; const xPk0 = -54.42; const xPk1 = -47.82; const xIn = -41.0;
+        const zc = 35.0; const zTop = 48.0;
+        const yb = 308.99; const zb = 30.0;                // M4 clamp screw
+        const f = switchFrame(vec3(-51.02, y0, zc), vec3(0, -1, 0), vec3(0, 0, 1));
         makeMount(context, id + "Y", [
-                    function(c, i) { bx(c, i, -21.8, xEnd, yFront, yFloor - 0.4, g0 + 0.4, g1 - 0.4); },
-                    function(c, i) { bx(c, i, xEnd, 2.2, yFront, yBack + 9.2, zb, 81.4); },
-                    function(c, i) { bx(c, i, -16.8, xEnd, yBack + GAP, yBack + 9.2, zb, 81.4); },
-                    function(c, i) { bx(c, i, 2.2, 14.0, yFront + 0.4, 333.0, zb, 92.0); },
-                    function(c, i) { bx(c, i, 20.6, 28.6, 317.0, 333.0, zb, 92.0); },
-                    function(c, i) { bx(c, i, 14.0, 20.6, 317.0, 333.0, zb, 79.0 - SNUG_HALF); },
-                    function(c, i) { bx(c, i, 14.0, 20.6, 317.0, 333.0, 79.0 + SNUG_HALF, 92.0); }],
-                [function(c, i) { cy(c, i, vec3(-9.3, yBack + GAP, 64.9), vec3(0, 1, 0), 0, 9.5, M4_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3(-9.3, 343.45, 64.9), vec3(0, 1, 0), vec3(0, 0, -1), M4_NUT_AF, M4_NUT_H, 11.0); },
-                    function(c, i) { cy(c, i, vec3(20.6, 320.3, 79.0), vec3(1, 0, 0), 0, 8.5, M3_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3(23.9, 320.3, 79.0), vec3(1, 0, 0), vec3(0, -1, 0), M3_NUT_AF, M3_NUT_H, 6.0); },
-                    function(c, i) { cy(c, i, vec3(20.4, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
-                    function(c, i) { cy(c, i, vec3(20.4, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
-                    function(c, i) { cy(c, i, vec3(14.0, f.holes[0][1], f.holes[0][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); },
-                    function(c, i) { cy(c, i, vec3(14.0, f.holes[1][1], f.holes[1][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); }], "Y");
+                    function(c, i) { bx(c, i, xOut, xPk0, y0, y1, 12.07, zTop); },
+                    function(c, i) { bx(c, i, xPk0, xIn, y0, y1, 17.07, zc - SNUG_HALF); },
+                    function(c, i) { bx(c, i, xPk0, xIn, y0, y1, zc + SNUG_HALF, zTop); },
+                    function(c, i) { bx(c, i, xPk1, xIn, y0, y1, 17.07, zTop); },
+                    function(c, i) { bx(c, i, xIn, -14.5, y0, y1, 36.28, zTop); },
+                    function(c, i) { bx(c, i, -22.6, -14.5, y0, y1, 21.07, zTop); }],
+                [function(c, i) { cy(c, i, vec3(-31.82, y0 - 0.5, 36.28), vec3(0, 1, 0), 0, 21.0, 16.2); },
+                    function(c, i) { bx(c, i, xPk0, xPk1, y0 - 0.5, y1 + 0.5, zc - SNUG_HALF, zc + SNUG_HALF); },
+                    function(c, i) { bx(c, i, xPk0, xPk1, y0 + SW_H + 0.3, y1 + 0.5, zc, zTop + 0.5); },
+                    function(c, i) { cy(c, i, vec3(-46.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
+                    function(c, i) { cy(c, i, vec3(-16.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
+                    function(c, i) { bx(c, i, -51.35, -42.35, y0 - 0.5, 304.05, 16.37, 22.37); },
+                    function(c, i) { bx(c, i, -21.35, -12.35, y0 - 0.5, 304.05, 16.37, 22.37); },
+                    function(c, i) { cy(c, i, vec3(-14.5, yb, zb), vec3(-1, 0, 0), 0, 9.0, M4_CLEAR); },
+                    function(c, i) { nutTrap(c, i, vec3(-18.0, yb, zb), vec3(1, 0, 0), vec3(0, -1, 0), M4_NUT_AF, M4_NUT_H, yb - y0 + 1.0); },
+                    function(c, i) { cy(c, i, vec3(xOut, y0 + 3.4, zc), vec3(1, 0, 0), -0.5, 7.0, M3_CLEAR); },
+                    function(c, i) { nutTrap(c, i, vec3((xOut + xPk0) / 2, y0 + 3.4, zc), vec3(1, 0, 0), vec3(0, -1, 0), M3_NUT_AF, M3_NUT_H, 4.0); },
+                    function(c, i) { cy(c, i, vec3(xOut, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), -0.5, 6.5, PIN_ACCESS); },
+                    function(c, i) { cy(c, i, vec3(xOut, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), -0.5, 6.5, PIN_ACCESS); },
+                    function(c, i) { cy(c, i, vec3(xPk1, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), 0, PIN_LEN - (xPk1 - xOut), PIN_HOLE); },
+                    function(c, i) { cy(c, i, vec3(xPk1, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), 0, PIN_LEN - (xPk1 - xOut), PIN_HOLE); }], "Y");
+        // jaw: leg on the right edge of the support (x -9.32), pivot ridge at its top against the body
+        makeMount(context, id + "Yj", [
+                    function(c, i) { bx(c, i, -13.9, -5.5, y0, y1, 17.07, 38.0); },
+                    function(c, i) { bx(c, i, -9.22, -5.5, y0, y1, 12.07, 17.07); },
+                    function(c, i) { bx(c, i, -14.5, -13.9, y0, y1, 36.0, 38.0); }],
+                [function(c, i) { cy(c, i, vec3(-16.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
+                    function(c, i) { bx(c, i, -21.35, -12.35, y0 - 0.5, 304.05, 16.37, 22.37); },
+                    function(c, i) { cy(c, i, vec3(-5.0, yb, zb), vec3(-1, 0, 0), 0, 10.0, M4_CLEAR); }], "Y_jaw");
         if (showSwitches)
             makeSwitch(context, id + "swY", f, "Y");
 }
@@ -256,21 +279,21 @@ function makeHardware(context is Context, id is Id)
 {
     makeBolt(context, id + "xl", vec3(35.29, 276.2, 337.5), vec3(-1, 0, 0), 12, 4.0, 7.0, 4.0, "bolt_M4x12_X_lock");
     makeNut(context, id + "xln", vec3(27.15, 276.2, 337.5), vec3(1, 0, 0), vec3(0, 0, -1), 7.0, 5.0, 4.0, "nut_M4_X_lock");
-    makeBolt(context, id + "xc", vec3(13.0, 276.2, 376.6), vec3(0, 0, -1), 10, 3.0, 6.0, 2.0, "bolt_M3x10_X_switch");
-    makeNut(context, id + "xcn", vec3(13.0, 276.2, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), 5.5, 4.0, 3.0, "nut_M3_X_switch");
-    makeBolt(context, id + "yl", vec3(-9.3, 351.09, 64.9), vec3(0, -1, 0), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Y_lock");
-    makeNut(context, id + "yln", vec3(-9.3, 343.45, 64.9), vec3(0, 1, 0), vec3(0, 0, -1), 7.0, 5.0, 4.0, "nut_M4_Y_lock");
-    makeBolt(context, id + "yc", vec3(30.4, 320.3, 79.0), vec3(-1, 0, 0), 10, 3.0, 6.0, 2.0, "bolt_M3x10_Y_switch");
-    makeNut(context, id + "ycn", vec3(23.9, 320.3, 79.0), vec3(1, 0, 0), vec3(0, -1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_switch");
+    makeBolt(context, id + "xc", vec3(13.0 + SWX, 276.2, 376.6), vec3(0, 0, -1), 10, 3.0, 6.0, 2.0, "bolt_M3x10_X_switch");
+    makeNut(context, id + "xcn", vec3(13.0 + SWX, 276.2, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), 5.5, 4.0, 3.0, "nut_M3_X_switch");
+    makeBolt(context, id + "yl", vec3(-5.5, 308.99, 30.0), vec3(-1, 0, 0), 16, 4.0, 7.0, 4.0, "bolt_M4x16_Y_clamp");
+    makeNut(context, id + "yln", vec3(-18.0, 308.99, 30.0), vec3(1, 0, 0), vec3(0, -1, 0), 7.0, 5.0, 4.0, "nut_M4_Y_clamp");
+    makeBolt(context, id + "yc", vec3(-64.22, 302.39, 35.0), vec3(1, 0, 0), 10, 3.0, 6.0, 2.0, "bolt_M3x10_Y_switch");
+    makeNut(context, id + "ycn", vec3(-57.42, 302.39, 35.0), vec3(1, 0, 0), vec3(0, -1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_switch");
     makeBolt(context, id + "zl", vec3(-310.8, 253.8, 381.74), vec3(0, 0, -1), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Z_lock");
     makeNut(context, id + "zln", vec3(-310.8, 253.8, 374.0), vec3(0, 0, 1), vec3(-1, 0, 0), 7.0, 5.0, 4.0, "nut_M4_Z_lock");
     makeBolt(context, id + "zc", vec3(-293.6, 153.0, 362.0), vec3(-1, 0, 0), 12, 3.0, 6.0, 2.0, "bolt_M3x12_Z_switch");
     makeNut(context, id + "zcn", vec3(-300.85, 153.0, 362.0), vec3(1, 0, 0), vec3(0, 0, -1), 5.5, 4.0, 3.0, "nut_M3_Z_switch");
     // printed pins through the switch holes (start on the face they are pushed in from)
-    makePin(context, id + "px1", vec3(16.8, 271.45, 374.8), vec3(0, 0, -1), "pin_X1");
-    makePin(context, id + "px2", vec3(16.8, 280.95, 374.8), vec3(0, 0, -1), "pin_X2");
-    makePin(context, id + "py1", vec3(28.6, 324.3, 74.25), vec3(-1, 0, 0), "pin_Y1");
-    makePin(context, id + "py2", vec3(28.6, 324.3, 83.75), vec3(-1, 0, 0), "pin_Y2");
+    makePin(context, id + "px1", vec3(16.8 + SWX, 271.45, 374.8), vec3(0, 0, -1), "pin_X1");
+    makePin(context, id + "px2", vec3(16.8 + SWX, 280.95, 374.8), vec3(0, 0, -1), "pin_X2");
+    makePin(context, id + "py1", vec3(-60.42, 306.29, 30.25), vec3(1, 0, 0), "pin_Y1");
+    makePin(context, id + "py2", vec3(-60.42, 306.29, 39.75), vec3(1, 0, 0), "pin_Y2");
     makePin(context, id + "pz1", vec3(-295.8, 148.25, 366.8), vec3(-1, 0, 0), "pin_Z1");
     makePin(context, id + "pz2", vec3(-295.8, 157.75, 366.8), vec3(-1, 0, 0), "pin_Z2");
 }
@@ -289,9 +312,40 @@ export function buildLimitMounts(context is Context, id is Id, showSwitches is b
     mountZ(context, id, showSwitches);
     if (showHardware)
         makeHardware(context, id + "hw");
+    mirrorXToLeft(context, id);
 }
 
-annotation { "Feature Type Name" : "Limit switch mounts" }
+// The X bracket is drawn in the right-side frame; move it (with its switch, screws, nuts and
+// pins) onto the left gantry side plate.
+function mirrorXToLeft(context is Context, id is Id)
+{
+    // parts picked by the ids that made them, with their names and colours (a body's name can't be
+    // read back inside the feature that set it)
+    const bolt = color(0.55, 0.55, 0.6);
+    const nut = color(0.7, 0.7, 0.2);
+    const pin = color(0.95, 0.95, 0.95);
+    const parts = [[id + "X", "mount_X", color(1.0, 0.45, 0.0)], [id + "swX" + "body", "switch_X", color(0.12, 0.12, 0.12)],
+                   [id + "swX" + "lever", "lever_X", color(0.75, 0.75, 0.78)], [id + "hw" + "xl", "bolt_M4x12_X_lock", bolt],
+                   [id + "hw" + "xln", "nut_M4_X_lock", nut], [id + "hw" + "xc", "bolt_M3x10_X_switch", bolt],
+                   [id + "hw" + "xcn", "nut_M3_X_switch", nut], [id + "hw" + "px1", "pin_X1", pin], [id + "hw" + "px2", "pin_X2", pin]];
+    const m = transform(vector(0, 0, X_LEFT_DZ) * millimeter) * mirrorAcross(plane(vector(X_MIRROR, 0, 0) * millimeter, vector(1, 0, 0)));
+    var originals = [];
+    for (var i = 0; i < size(parts); i += 1)
+    {
+        const q = qCreatedBy(parts[i][0], EntityType.BODY);
+        if (size(evaluateQuery(context, q)) == 0)
+            continue;
+        // a mirror can't be applied with opTransform, so copy the body across and delete the original
+        opPattern(context, id + ("mirX" ~ i), { "entities" : q, "transforms" : [m], "instanceNames" : ["L"] });
+        setProperty(context, { "entities" : qCreatedBy(id + ("mirX" ~ i), EntityType.BODY), "propertyType" : PropertyType.NAME, "value" : parts[i][1] });
+        setProperty(context, { "entities" : qCreatedBy(id + ("mirX" ~ i), EntityType.BODY), "propertyType" : PropertyType.APPEARANCE, "value" : parts[i][2] });
+        originals = append(originals, q);
+    }
+    if (size(originals) > 0)
+        opDeleteBodies(context, id + "mirXdel", { "entities" : qUnion(originals) });
+}
+
+annotation { "Feature Type Name" : "Limit switch mounts (v3)" }
 export const limitSwitchMounts = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
     {

@@ -1,5 +1,5 @@
 GRBL 1.1h settings for the blue desktop CNC (Nano with the spindle-enable GRBL build).
-Full working setup: limit switches on D9/D10/D12 with homing on, Y and Z directions flipped, spindle max 24000 RPM.
+Full working setup: limit switches on D9/D10/D12 with homing on (X homes left, Y back, Z up), Y and Z directions flipped, spindle max 24000 RPM.
 To restore, paste the $ lines into gSender's console, then home with $H.
 
 $0=20
@@ -16,7 +16,7 @@ $13=0
 $20=0
 $21=1
 $22=1
-$23=0
+$23=1
 $24=50.000
 $25=500.000
 $26=250
@@ -33,6 +33,6 @@ $112=640.000
 $120=100.000
 $121=100.000
 $122=50.000
-$130=376.000
+$130=375.000
 $131=553.000
 $132=65.000
