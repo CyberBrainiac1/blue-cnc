@@ -1,26 +1,27 @@
-GRBL 1.1h settings for the blue desktop CNC (Nano, adapter wired in GRBL order).
-Saved 2026-10-24 after calibration and speed tests. To restore, paste these lines into a sender's console.
+GRBL 1.1h settings for the blue desktop CNC (Nano with the spindle-enable GRBL build).
+Full working setup: limit switches on D9/D10/D12 with homing on, Y and Z directions flipped, spindle max 24000 RPM.
+To restore, paste the $ lines into gSender's console, then home with $H.
 
 $0=20
 $1=25
 $2=7
-$3=2
+$3=6
 $4=0
-$5=0
+$5=1
 $6=0
 $10=1
 $11=0.010
 $12=0.002
 $13=0
 $20=0
-$21=0
-$22=0
+$21=1
+$22=1
 $23=0
-$24=25.000
+$24=50.000
 $25=500.000
 $26=250
-$27=1.000
-$30=1000
+$27=2.000
+$30=24000
 $31=0
 $32=0
 $100=344.828
@@ -32,6 +33,6 @@ $112=640.000
 $120=100.000
 $121=100.000
 $122=50.000
-$130=200.000
-$131=200.000
-$132=200.000
+$130=376.000
+$131=572.000
+$132=65.000
