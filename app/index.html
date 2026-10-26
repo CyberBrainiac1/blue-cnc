@@ -21,9 +21,13 @@
         <p class="small">From Onshape CAM Studio, Fusion 360, Kiri:Moto, SolidWorks CAM (mach_iii post) and most other CAM programs.</p>
       </div>
       <div id="onshapePick" hidden>
-        <p class="small">Or open an NC file you imported into this Onshape document:</p>
-        <select id="onshapeFiles"></select>
-        <button id="onshapeLoad">Open</button>
+        <p class="small">Or open an NC file you imported into this Onshape document.</p>
+        <div class="row">
+          <button id="onshapeSignIn">Sign in to Onshape</button>
+          <select id="onshapeFiles" hidden></select>
+          <button id="onshapeLoad" hidden>Open</button>
+        </div>
+        <p id="onshapeNote" class="small"></p>
       </div>
       <div id="result" hidden>
         <p id="fileName"></p>
@@ -36,6 +40,7 @@
         <div class="row">
           <button id="download">Download GRBL file</button>
           <button id="downloadParts" hidden>Download one file per tool</button>
+          <button id="saveOnshape" hidden>Save to this Onshape document</button>
         </div>
       </div>
 
@@ -75,6 +80,10 @@
     <section id="sendPanel">
       <h2>3. Send it to the machine</h2>
       <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
+      <div id="inFrame" class="row" hidden>
+        <span>Sending over USB needs GRBL Prep in its own browser tab.</span>
+        <button id="openTab">Open in its own tab to send</button>
+      </div>
       <div class="row">
         <button id="connect">Connect to GRBL</button>
         <span id="state" class="state">Not connected</span>
@@ -121,6 +130,8 @@
       <h3>Sending</h3>
       <p>Plug the GRBL board into the laptop with USB and click Connect. This works in Chrome and Edge. The board resets when it connects, so connect before you turn on the spindle's VFD. Home the machine, zero it on the CAM origin in gSender (close gSender before you connect here), then click Start job.</p>
       <p>Pause holds the motion and Resume carries on. STOP holds the motion and then resets GRBL, so everything stops and the machine needs homing again. If GRBL reports an error, the job pauses and the page says which line and why.</p>
+      <h3>Inside Onshape</h3>
+      <p>In CAM Studio, post your toolpath and save the NC file, then import it into the same document (the + menu, then Import). In GRBL Prep, click Sign in to Onshape once, pick the file from the list and click Open. "Save to this Onshape document" adds the GRBL version as a new tab, so it's versioned with the part. The page only reads and adds file tabs. It never changes your parts.</p>
       <h3>Machine settings</h3>
       <p>They start out as the team's blue desktop CNC. Change them to match your router. They're saved in this browser.</p>
       <div class="row"><button value="close">Close</button></div>

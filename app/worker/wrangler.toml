@@ -1,0 +1,9 @@
+name = "grbl-prep-onshape"
+main = "index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+APP_URL = "https://cyberbrainiac1.github.io/blue-cnc/app/"
+# CLIENT_ID goes here once the app is registered in Onshape's developer portal.
+CLIENT_ID = ""
+# CLIENT_SECRET is not in this file. Add it as a secret: npx wrangler secret put CLIENT_SECRET

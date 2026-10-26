@@ -4,6 +4,7 @@ import { drawPath } from './preview.js';
 import { GrblSender, STATES } from './grbl.js';
 import { serialWorks, openSerial } from './serial.js';
 import { MockGrbl } from './mockgrbl.js';
+import * as onshape from './onshape.js';
 
 const $ = id => document.getElementById(id);
 const useMock = new URLSearchParams(location.search).has('mock');
@@ -99,6 +100,7 @@ export function loadText(name, source) {
     $('warnings').replaceChildren('Check these before you run it:', ul);
   }
   $('download').disabled = false;
+  $('saveOnshape').hidden = !(onshapeCtx && onshape.signedIn());
   $('downloadParts').hidden = job.parts.length < 2;
   $('downloadParts').textContent = `Download one file per tool (${job.parts.length} files)`;
   drawAll(path);
@@ -270,10 +272,87 @@ $('checklist').querySelector('form').addEventListener('submit', e => {
 
 $('helpButton').addEventListener('click', () => $('help').showModal());
 
+// ---------- inside Onshape ----------
+
+const onshapeCtx = onshape.onshapeContext();
+const inFrame = window.top !== window;
+
+async function showOnshapeFiles() {
+  $('onshapeNote').textContent = 'Looking for NC files in this document...';
+  try {
+    const files = await onshape.listNcFiles(onshapeCtx);
+    $('onshapeSignIn').hidden = true;
+    $('onshapeFiles').replaceChildren(...files.map(f => new Option(f.name, f.id)));
+    $('onshapeFiles').hidden = $('onshapeLoad').hidden = !files.length;
+    $('onshapeNote').textContent = files.length ? '' : 'No NC files here yet. Post from CAM Studio, then import the file into this document.';
+  } catch (err) {
+    $('onshapeNote').textContent = err.message;
+  }
+}
+
+if (onshapeCtx) {
+  onshape.keepOnshapeAwake(onshapeCtx);
+  $('onshapePick').hidden = false;
+  if (!onshape.isSetUp()) {
+    $('onshapeSignIn').disabled = true;
+    $('onshapeNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so drop the file in instead.';
+  } else if (onshape.signedIn()) {
+    showOnshapeFiles();
+  }
+}
+
+$('onshapeSignIn').addEventListener('click', async () => {
+  try {
+    await onshape.signIn();
+    showOnshapeFiles();
+  } catch (err) {
+    $('onshapeNote').textContent = err.message;
+  }
+});
+
+$('onshapeLoad').addEventListener('click', async () => {
+  const option = $('onshapeFiles').selectedOptions[0];
+  try {
+    loadText(option.text, await onshape.readFile(onshapeCtx, option.value));
+  } catch (err) {
+    $('onshapeNote').textContent = err.message;
+  }
+});
+
+$('saveOnshape').addEventListener('click', async () => {
+  const name = `${baseName(job.name)}_grbl.nc`;
+  try {
+    await onshape.saveToDocument(onshapeCtx, name, job.lines);
+    $('onshapeNote').textContent = `Saved ${name} as a new tab in this document.`;
+  } catch (err) {
+    $('onshapeNote').textContent = err.message;
+  }
+});
+
+// Browsers don't let pages inside another site's frame use USB, so sending happens in a tab of its own.
+$('openTab').addEventListener('click', () => {
+  if (job) {
+    try { localStorage.setItem('grblprep.handoff', JSON.stringify({ name: job.name, source: job.source })); } catch {}
+  }
+  window.open(new URL('./?handoff', location.href), '_blank');
+});
+
+function pickUpHandoff() {
+  if (!new URLSearchParams(location.search).has('handoff')) return;
+  try {
+    const h = JSON.parse(localStorage.getItem('grblprep.handoff'));
+    localStorage.removeItem('grblprep.handoff');
+    if (h) loadText(h.name, h.source);
+  } catch {}
+}
+
 // ---------- start up ----------
 
 fillMachineForm();
-$('noSerial').hidden = serialWorks() || useMock;
-$('connect').disabled = !serialWorks() && !useMock;
+const canSend = (serialWorks() && !inFrame) || useMock;
+$('noSerial').hidden = canSend || inFrame;
+$('inFrame').hidden = !inFrame || useMock;
+$('connect').disabled = !canSend;
+pickUpHandoff();
 updateButtons();
 window.grblPrep = { loadText };
