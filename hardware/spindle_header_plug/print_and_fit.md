@@ -75,7 +75,7 @@ Hardware: **4× M3 hex bolts, 12 mm** (10 mm is the bare minimum; 14 and 16 mm s
 
 ## 5. Wire it
 
-The wire colours come from `../spindle_vfd_setup.md`:
+The wire colours come from `docs/spindle_and_vfd_setup.md`:
 
 | Header pin | Wire | VFD terminal |
 |-----------|------|--------------|
