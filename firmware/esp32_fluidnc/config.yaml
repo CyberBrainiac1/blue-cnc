@@ -1,7 +1,7 @@
 # FluidNC config for the blue desktop CNC (JP-3163B "JIPING V3.9" TB6560 board),
 # driven from a plain ESP32 DevKit wired straight to the box's DB25 port.
 #
-# Pins (see ../README.md for the diagram):
+# Pins (the diagram is in the setup guide's "ESP32 / FluidNC option" tab):
 #   DB25 2/3 = X step/dir <- GPIO 32/33
 #   DB25 4/5 = Y step/dir <- GPIO 25/26
 #   DB25 6/7 = Z step/dir <- GPIO 27/13
