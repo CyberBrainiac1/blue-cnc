@@ -6,7 +6,7 @@
 // Settings (Workers > this worker > Settings > Variables):
 //   CLIENT_ID      the OAuth client ID from Onshape's developer portal
 //   CLIENT_SECRET  the OAuth client secret (add it as an encrypted secret)
-//   APP_URL        where the page lives, e.g. https://cyberbrainiac1.github.io/blue-cnc/app/
+//   APP_URL        where the page lives, e.g. https://cyberbrainiac1.github.io/blue-cnc/vibe-app/
 
 const ONSHAPE = 'https://cad.onshape.com';
 const TOKEN_URL = 'https://oauth.onshape.com/oauth/token';

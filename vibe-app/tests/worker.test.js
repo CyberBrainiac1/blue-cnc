@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../worker/index.js';
 
-const env = { CLIENT_ID: 'client123', CLIENT_SECRET: 'not-a-real-secret', APP_URL: 'https://example.github.io/blue-cnc/app/' };
+const env = { CLIENT_ID: 'client123', CLIENT_SECRET: 'not-a-real-secret', APP_URL: 'https://example.github.io/blue-cnc/vibe-app/' };
 const realFetch = globalThis.fetch;
 let calls;
 
@@ -27,7 +27,7 @@ test('the sign-in callback swaps the code and sends tokens back in the fragment'
   const reply = await ask('/oauth/callback?code=abc&state=s1');
   assert.equal(reply.status, 302);
   const to = new URL(reply.headers.get('Location'));
-  assert.equal(to.origin + to.pathname, 'https://example.github.io/blue-cnc/app/signed_in.html');
+  assert.equal(to.origin + to.pathname, 'https://example.github.io/blue-cnc/vibe-app/signed_in.html');
   assert.equal(to.search, '', 'tokens never go in the query string');
   const back = new URLSearchParams(to.hash.slice(1));
   assert.equal(back.get('access_token'), 'acc');
