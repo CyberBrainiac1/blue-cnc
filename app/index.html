@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRBL Prep</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>GRBL Prep</h1>
+    <span class="tagline">Get CAM G-code ready for a GRBL router, then send it.</span>
+    <button id="helpButton" class="quiet">Help</button>
+  </header>
+
+  <main>
+    <section id="filePanel">
+      <h2>1. Your G-code</h2>
+      <div id="drop" tabindex="0">
+        <p><strong>Drop a G-code file here</strong> or <label class="link">pick one<input type="file" id="fileInput" accept=".nc,.gcode,.ngc,.tap,.txt,.cnc,.g"></label></p>
+        <p class="small">From Onshape CAM Studio, Fusion 360, Kiri:Moto, SolidWorks CAM (mach_iii post) and most other CAM programs.</p>
+      </div>
+      <div id="onshapePick" hidden>
+        <p class="small">Or open an NC file you imported into this Onshape document:</p>
+        <select id="onshapeFiles"></select>
+        <button id="onshapeLoad">Open</button>
+      </div>
+      <div id="result" hidden>
+        <p id="fileName"></p>
+        <div id="refused" class="refused" hidden></div>
+        <div id="warnings" class="warnings" hidden></div>
+        <details id="changesBox" open>
+          <summary id="changesTitle">What changed</summary>
+          <ul id="changes"></ul>
+        </details>
+        <div class="row">
+          <button id="download">Download GRBL file</button>
+          <button id="downloadParts" hidden>Download one file per tool</button>
+        </div>
+      </div>
+
+      <details id="machineBox">
+        <summary>Machine settings</summary>
+        <form id="machine">
+          <label>Name <input name="name"></label>
+          <fieldset>
+            <legend>Travel (mm)</legend>
+            <label>X <input name="travel.x" type="number" step="any"></label>
+            <label>Y <input name="travel.y" type="number" step="any"></label>
+            <label>Z <input name="travel.z" type="number" step="any"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Top feed (mm/min)</legend>
+            <label>X <input name="maxFeed.x" type="number" step="any"></label>
+            <label>Y <input name="maxFeed.y" type="number" step="any"></label>
+            <label>Z <input name="maxFeed.z" type="number" step="any"></label>
+          </fieldset>
+          <label>Spindle max RPM <input name="spindleMax" type="number" step="any"></label>
+          <label>Safe Z for lifts (mm) <input name="safeZ" type="number" step="any"></label>
+          <button type="button" id="machineReset" class="quiet">Back to the blue desktop CNC</button>
+        </form>
+      </details>
+    </section>
+
+    <section id="previewPanel">
+      <h2>2. Check the toolpath</h2>
+      <div class="views">
+        <figure><canvas id="top" width="460" height="340"></canvas><figcaption>From above (X and Y)</figcaption></figure>
+        <figure><canvas id="side" width="460" height="160"></canvas><figcaption>From the front (X and Z)</figcaption></figure>
+      </div>
+      <p class="small">Solid lines cut, dashed lines are rapid moves. The red cross is X0 Y0, the point you zero on.</p>
+      <p id="size" class="small"></p>
+    </section>
+
+    <section id="sendPanel">
+      <h2>3. Send it to the machine</h2>
+      <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
+      <div class="row">
+        <button id="connect">Connect to GRBL</button>
+        <span id="state" class="state">Not connected</span>
+        <span id="where" class="small"></span>
+      </div>
+      <progress id="progress" value="0" max="1"></progress>
+      <p id="progressText" class="small"></p>
+      <div class="row controls">
+        <button id="home" disabled>Home ($H)</button>
+        <button id="start" disabled>Start job</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="resume" disabled>Resume</button>
+        <button id="stop" class="stop" disabled>STOP</button>
+      </div>
+      <div id="machineMessages"></div>
+    </section>
+  </main>
+
+  <dialog id="checklist">
+    <form method="dialog">
+      <h2>Before you start</h2>
+      <label><input type="checkbox" required> Water is coming back out of the spindle.</label>
+      <label><input type="checkbox" required> The end mill is tight in the collet.</label>
+      <label><input type="checkbox" required> You zeroed X, Y and Z on the CAM origin.</label>
+      <label><input type="checkbox" required> Your hand is on the E-stop (the outlet switch).</label>
+      <div class="row">
+        <button value="cancel" formnovalidate class="quiet">Not yet</button>
+        <button id="go" value="go">Start the job</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="help">
+    <form method="dialog">
+      <h2>How to use GRBL Prep</h2>
+      <h3>Converting</h3>
+      <p>Post your toolpath from CAM as plain G-code and drop the file in. The page changes the parts GRBL can't run, lists every change, and draws the path so you can check it before anything moves. Nothing leaves your computer.</p>
+      <p>It takes out program numbers, line numbers, tool length offsets and codes GRBL doesn't have. It turns drilling cycles into plain moves, swaps G28 for a lift and a move back to X0 Y0, and fixes dwells written in milliseconds. If a file uses cutter compensation, feed per rev, macros or a fourth axis, it stops and tells you what to change in your CAM.</p>
+      <p>Check the warnings. The most important one is when the job is bigger than the machine's travel.</p>
+      <h3>Tool changes</h3>
+      <p>GRBL can't change tools by itself. The converted file stops the spindle, lifts Z and pauses at each change. This page can't jog, so for jobs with more than one end mill it's easiest to click "Download one file per tool", run the first file, swap the end mill and re-zero Z in gSender, then run the next one.</p>
+      <h3>Which CAM settings to use</h3>
+      <p>Onshape CAM Studio: pick the 3-Axis Generic Milling - GRBL machine. Fusion 360: the grbl post. Kiri:Moto: the Any.Generic.Grbl device. SolidWorks CAM: the mach_iii post. In all of them, turn cutter compensation off and set feeds in mm per minute.</p>
+      <h3>Sending</h3>
+      <p>Plug the GRBL board into the laptop with USB and click Connect. This works in Chrome and Edge. The board resets when it connects, so connect before you turn on the spindle's VFD. Home the machine, zero it on the CAM origin in gSender (close gSender before you connect here), then click Start job.</p>
+      <p>Pause holds the motion and Resume carries on. STOP holds the motion and then resets GRBL, so everything stops and the machine needs homing again. If GRBL reports an error, the job pauses and the page says which line and why.</p>
+      <h3>Machine settings</h3>
+      <p>They start out as the team's blue desktop CNC. Change them to match your router. They're saved in this browser.</p>
+      <div class="row"><button value="close">Close</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

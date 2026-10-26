@@ -1,0 +1,14 @@
+(Hand-written in the style of Onshape CAM Studio's 3-Axis Generic Milling - GRBL machine, not a real export)
+(PROGRAM: BRACKET)
+N10 G21 G90 G94 G17
+N20 T1 M6 (6MM FLAT END MILL)
+N30 S18000 M3
+N40 G0 X0 Y0 Z10
+N50 G1 Z-2 F200
+N60 G1 X30 Y0 F1000
+N70 G1 X30 Y20
+N80 G1 X0 Y20
+N90 G1 X0 Y0
+N100 G0 Z10
+N110 M5
+N120 M30
