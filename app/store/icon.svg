@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="44" fill="#1f3a5a"/>
+  <!-- a toolpath with an end mill finishing the last corner -->
+  <path d="M52 196 H148 Q196 196 196 148 V60" fill="none" stroke="#9fc3e8" stroke-width="14" stroke-linecap="round" stroke-dasharray="1 26"/>
+  <path d="M52 196 H148 Q196 196 196 148 V112" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+  <rect x="180" y="36" width="32" height="70" rx="6" fill="#fff"/>
+  <path d="M184 106 h24 l-12 14 z" fill="#fff"/>
+  <text x="60" y="140" font-family="Segoe UI, Arial, sans-serif" font-weight="700" font-size="64" fill="#fff">G</text>
+</svg>

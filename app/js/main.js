@@ -270,7 +270,10 @@ $('checklist').querySelector('form').addEventListener('submit', e => {
   updateButtons();
 });
 
-$('helpButton').addEventListener('click', () => $('help').showModal());
+$('helpButton').addEventListener('click', () => {
+  $('help').showModal();
+  $('help').scrollTop = 0; // Close is the only button, so focus would scroll it to the bottom
+});
 
 // ---------- inside Onshape ----------
 

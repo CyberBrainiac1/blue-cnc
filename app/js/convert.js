@@ -10,12 +10,15 @@ export const TEAM_MACHINE = {
 };
 
 const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
-const DROP_G = new Set(['43', '49', '64', '61', '91.1', '94']); // GRBL can't use these, or doesn't need them
+const DROP_G = {
+  '43': 'Removed G43 tool length offsets. GRBL doesn\'t have them, so zero Z on each tool instead.',
+  '64': 'Removed G64 (path blending). GRBL already blends moves together.',
+};
 const DRILL_G = new Set(['81', '82', '83', '73']);
 const MOTION_G = new Set(['0', '1', '2', '3']);
 const GRBL_G = new Set(['0', '1', '2', '3', '4', '10', '17', '18', '19', '20', '21', '28', '28.1', '30', '30.1',
-  '38.2', '38.3', '38.4', '38.5', '40', '43.1', '53', '54', '55', '56', '57', '58', '59', '80', '90', '91',
-  '92', '92.1']);
+  '38.2', '38.3', '38.4', '38.5', '40', '43.1', '49', '53', '54', '55', '56', '57', '58', '59', '61', '80', '90',
+  '91', '91.1', '92', '92.1', '94']);
 const GRBL_M = new Set(['0', '1', '2', '3', '4', '5', '8', '9', '30']);
 const REFUSE_G = {
   '41': 'cutter compensation (G41). Turn cutter compensation off in your CAM, so the toolpath is already offset',
@@ -207,9 +210,9 @@ class Converter {
     if (g.includes('99')) this.retractToStart = false;
     if (g.includes('90.1')) this.note('g901', n, 'Changed absolute arc centres (G90.1) into the relative I/J/K that GRBL uses.');
     for (const code of g) {
-      if (DROP_G.has(code)) this.note('g' + code, n, `Removed G${code}, which GRBL can't use.`);
+      if (DROP_G[code]) this.note('g' + code, n, DROP_G[code]);
     }
-    g = g.filter(x => !DROP_G.has(x) && x !== '90.1' && x !== '98' && x !== '99');
+    g = g.filter(x => !DROP_G[x] && x !== '90.1' && x !== '98' && x !== '99');
     if (v.F !== undefined) this.feed = v.F;
 
     if (m.includes('7')) {

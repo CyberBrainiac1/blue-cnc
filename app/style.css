@@ -16,7 +16,10 @@ header {
 
 header h1 { margin: 0; font-size: 20px; }
 header .tagline { opacity: 0.85; flex: 1; }
-header button { color: #fff; border-color: #fff8; }
+header button.quiet { color: #fff; border-color: #fff8; }
+
+/* .row sets display, which would otherwise beat the hidden attribute */
+[hidden] { display: none !important; }
 
 main {
   display: grid;
@@ -105,7 +108,7 @@ form#machine input[name="name"] { width: 200px; }
 fieldset { border: 1px solid #dde1e6; border-radius: 6px; margin: 6px 0; display: flex; gap: 10px; }
 fieldset label { display: inline-block !important; }
 
-dialog { max-width: 560px; border: none; border-radius: 10px; box-shadow: 0 8px 40px #0004; }
+dialog { max-width: 560px; max-height: 85vh; overflow: auto; border: none; border-radius: 10px; box-shadow: 0 8px 40px #0004; }
 dialog label { display: block; margin: 8px 0; }
 
 @media (max-width: 800px) {
