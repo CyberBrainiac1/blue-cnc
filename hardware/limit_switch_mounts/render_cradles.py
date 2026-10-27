@@ -55,9 +55,10 @@ def section_x(ax):
 
 
 def section_y(ax):
-    """Cut across the Y bracket on the lock screw, looking from the back: tongue in the table's T-slot."""
-    yl, zl = fm.Y_LOCK
+    """Cut across the Y bracket on the rear T-bolt, looking from the back."""
+    yl, zl = fm.Y_BOLTS[1], fm.Y_BOLT_Z
     b, _, _ = fm.y_mount()
+    carrier, _ = fm.y_nut()
     pb = (-40.0, 40.0, yl, yl + 0.01, 40.0, 120.0)
     table = (cq.Workplane("XZ").polyline([(-40, 81.87), (-2.72, 81.87), (-2.72, 86.37), (-4.92, 86.37), (-4.92, 84.07), (-9.49, 84.07),
                                            (-9.49, 94.77), (-4.92, 94.77), (-4.92, 92.37), (-2.72, 92.37), (-2.72, 96.97), (-40, 96.97)]).close()
@@ -66,17 +67,20 @@ def section_y(ax):
     ax.add_patch(plt.Rectangle((-40, 40), 38.18, 41.87, color=np.array([0.8, 0.8, 0.82]), alpha=0.5, lw=0))
     ax.text(-38, 60, "back end plate\n(in front of the cut)", fontsize=8, color="0.3")
     plot_section(ax, b, pb, "xz", ORANGE)
-    # M4 x 12 (tip on the table side, head about 2.3 mm proud) and its nyloc
-    ax.add_patch(plt.Rectangle((-2.72, zl - 2.0), 12.0, 4.0, color="0.55"))
-    ax.add_patch(plt.Rectangle((9.28, zl - 3.5), 4.0, 7.0, color="0.4"))
-    ax.add_patch(plt.Rectangle((0.1, zl - 4.04), 5.0, 8.08, color="0.4"))
-    ax.annotate("M4 x 12", (11.3, zl + 3.5), (14, zl + 10), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
-    ax.annotate("tongue in the\ntable's T-slot", (-7.2, 89.4), (-36, 104), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
+    plot_section(ax, carrier, pb, "xz", LIGHT)
+    # M3 x 16 T-bolt: hex head in the carrier, nyloc in the bracket's counterbore
+    head = fm.T_BACK + 0.2 + fm.M3_HEAD_H
+    ax.add_patch(plt.Rectangle((head, zl - 1.5), 16.0, 3.0, color="0.55"))
+    ax.add_patch(plt.Rectangle((head - 2.0, zl - 2.75), 2.0, 5.5, color="0.4"))
+    ax.add_patch(plt.Rectangle((fm.Y_NUT_SEAT, zl - 2.75), 4.0, 5.5, color="0.4"))
+    ax.annotate("M3 x 16 + nyloc", (8.0, zl + 1.5), (12, zl + 12), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
+    ax.annotate("carrier in the T-slot\n(holds the bolt head)", (-7.2, 93.5), (-38, 106), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
+    ax.annotate("lips clamped between\ncarrier and bracket", (-3.8, 85.2), (-38, 70), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
     ax.annotate("stop tab (rests on the\nend plate's back face)", (-3.8, 76), (-36, 46), fontsize=8, arrowprops={"arrowstyle": "-", "lw": 0.6})
     ax.text(-38, 98.5, "table", fontsize=8, color="0.3")
     ax.set_xlim(-40, 32); ax.set_ylim(40, 112); ax.set_aspect("equal")
     ax.set_xlabel("x (mm)"); ax.set_ylabel("z (mm)")
-    ax.set_title("Y: bracket in the T-slot on the table's right edge\n(cut on the lock screw, seen from the back)", fontsize=10)
+    ax.set_title("Y: clamped to the T-slot on the table's right edge\n(cut on a T-bolt, seen from the back)", fontsize=10)
 
 
 def scene_z():

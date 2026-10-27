@@ -3,8 +3,9 @@ KW11 / 10T85 / SS-5GL micro switches with the wire lever cut to ~16.5 mm.
 
 Nothing sits on the rails or rods and nothing needs drilling. Hardware is only what's on
 hand: M3 hex-head bolts, M4 socket-head screws and nyloc nuts for both.
-  - Each bracket is locked by one M4 socket screw running through a trapped M4 nyloc nut; its
-    tip presses the aluminium (X and Z clip onto a plate edge, Y sits in the table's side T-slot).
+  - X and Z clip onto a plate edge and are locked by one M4 socket screw running through a
+    trapped M4 nyloc nut; its tip presses the aluminium. Y clamps the table's side T-slot with two
+    M3 T-bolts (nothing pushes on the table).
   - Each switch sits in a pocket between two end walls and is clamped by
     one M3 hex bolt running through a trapped M3 nyloc nut; its tip presses the switch body.
     The switch's own 2.35 mm holes are not used.
@@ -12,9 +13,10 @@ hand: M3 hex-head bolts, M4 socket-head screws and nyloc nuts for both.
   X (home -X, left): saddle over the top edge of the LEFT gantry side plate. The left end of
      the X carriage top plate (Z motor plate) hits the lever. Its inner jaw sits over the end of
      the upper 20 mm X rod, so it locates itself. Drawn in the right-side frame and mirrored.
-  Y (home +Y, back/motor end): a tongue in the T-slot on the side of the table's right-hand
-     edge, slid in from the back end until it stops on the back end plate, locked by one M4.
-     The back edge of the gantry's right side plate hits the lever.
+  Y (home +Y, back/motor end): clamped to the T-slot on the side of the table's right-hand
+     edge like T-slot hardware: a printed carrier in the slot holds two M3 hex bolt heads, M3
+     nylocs on the outside pull the bracket against the slot lips. A tab stops it on the back end
+     plate. The back edge of the gantry's right side plate hits the lever.
   Z (home +Z, up): clip on the right edge of the Z top plate, arm forward so the switch
      hangs over the spindle holder's right clamp ear, which hits the lever.
      A fork on top slides onto the Z rod's top screw head and stops there.
@@ -60,7 +62,7 @@ Z_HEAD_R = 4.25 + 0.1
 HARDWARE = {
     ("X", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
     ("X", "switch clamp"): ("M3 hex head", 10, "M3 nyloc"),
-    ("Y", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
+    ("Y", "T-slot clamp (x2)"): ("M3 hex head", 16, "M3 nyloc"),
     ("Y", "switch clamp"): ("M3 hex head", 10, "M3 nyloc"),
     ("Z", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
     ("Z", "switch clamp"): ("M3 hex head", 12, "M3 nyloc"),
@@ -171,7 +173,10 @@ def x_mount():
 # ---------------------------------------------------------------- Y axis
 # The table's right-hand edge profile has a T-slot along its side face (x -2.72): 6 mm opening
 # (z 86.37..92.37), 2.2 mm lips, chamber x -9.49..-4.92 x z 84.07..94.77. It runs the full table
-# length and is open at the back end (y 349.09). The bracket's tongue slides into it from the back.
+# length and is open at the back end (y 349.09). It is clamped like T-slot hardware: a printed
+# carrier in the chamber holds two M3 hex bolt heads (an M4 nyloc is 5 mm thick, too thick for the
+# 4.57 mm chamber); the bolts come out through the slot opening and the bracket, and M3 nylocs pull
+# the carrier against the inside of the lips and the bracket's flat face against the outside.
 T_FACE, T_LIP, T_BACK = -2.72, -4.92, -9.49       # table side face, inside of the lips, back of the chamber
 T_OPEN = (86.37, 92.37)                           # slot opening (z)
 T_CHAMBER = (84.07, 94.77)                        # chamber (z)
@@ -180,35 +185,38 @@ Y_END_PLATE = (319.09, 339.09, -1.82, 81.87)      # back end plate: front, back 
 Y_FACE = 317.0                                    # lever face / front of the bracket (the gantry's right
                                                   # side plate back edge is at 314.19 when Y = 0)
 Y_ZC = 81.0                                       # switch centre height
-Y_LOCK = (340.0, 94.7)                            # M4 lock screw (y, z): its tip presses the table side face
-                                                  # in the solid band above the slot
+Y_BOLTS = (337.0, 344.5)                          # M3 x 16 T-bolts (y), on the slot centre line
+Y_BOLT_Z = (T_OPEN[0] + T_OPEN[1]) / 2
+Y_CARRIER = (331.0, T_TABLE[2] - 0.1)             # carrier length along the slot
+M3_HEAD_AF, M3_HEAD_H = 5.8, 2.1                  # pocket for an M3 hex head (5.5 x 2.0)
+Y_NUT_SEAT = 2.0                                  # x of the nyloc seat (bottom of the counterbore)
 
 
 def y_mount():
-    """Y bracket on the table's right-hand edge: a tongue in the side T-slot, slid in from the back
-    end of the table until a tab under the table stops on the back face of the back end plate.
-    One M4 x 12 through a trapped nyloc pushes on the table side, pulling the tongue tight against
-    the slot lips. The switch sits where the gantry's right side plate hits it (lever facing -y)."""
+    """Y bracket on the table's right-hand edge, clamped to the side T-slot by two M3 T-bolts (see
+    y_nut). A rib in the slot opening keeps it square; a tab under the table stops on the back face
+    of the back end plate. The switch sits where the gantry's right side plate hits it."""
     y0, y1 = Y_FACE, T_TABLE[2] - 0.1
     ep_front, ep_back, ep_end, ep_top = Y_END_PLATE
     zc = Y_ZC
     zb = 68.6                                                      # above the gantry's bottom beam (z 67.8)
-    b = box(T_FACE + GAP, 7.0, y0, y1, T_TABLE[0] + 0.2, 99.5)     # plate along the table side
+    yp = 331.0                                                     # switch pocket ends here
+    b = box(T_FACE, 7.0, y0, y1, T_TABLE[0] + 0.2, T_TABLE[1] - 0.2)   # plate: flat face on the table side
     b = b.union(box(ep_end + GAP, 7.0, y0, y1, zb, T_TABLE[0] + 0.2))   # below the table, right of the end plate
     b = b.union(box(-6.0, ep_end + GAP, ep_back + 0.1, y1, 70.0, T_TABLE[0] - 0.2))   # stop tab behind the end plate
-    b = b.union(box(T_BACK + GAP, T_LIP - 0.1, y0, y1, T_CHAMBER[0] + GAP, T_CHAMBER[1] - GAP))   # tongue
-    b = b.union(box(T_LIP - 0.1, T_FACE + GAP, y0, y1, T_OPEN[0] + GAP, T_OPEN[1] - GAP))        # neck
-    yp = 333.0                                                     # switch pocket ends here; lock screw behind it
+    b = b.union(box(T_LIP + 0.2, T_FACE, y0, y1, T_OPEN[0] + GAP, T_OPEN[1] - GAP))   # rib in the slot opening
     b = b.union(box(7.0, 14.0, y0, yp, zb, 94.0))                  # backing behind the switch
     # switch pocket: outer wall carrying the clamp, end walls (front edge flush with the switch's
     # lever face). The terminal side is left open for soldered wires.
     b = b.union(box(20.6, 28.6, y0, yp, zb, 94.0))
     b = b.union(box(14.0, 20.6, y0, yp, zb, zc - SNUG_HALF))
     b = b.union(box(14.0, 20.6, y0, yp, zc + SNUG_HALF, 94.0))
-    # M4 lock: along -x through the plate, nyloc pushed in from the back face
-    yl, zl = Y_LOCK
-    b = b.cut(round_cut((T_FACE, yl, zl), (1, 0, 0), -0.5, 10.5, M4_CLEAR))
-    b = b.cut(nut_trap((2.6, yl, zl), (1, 0, 0), (0, 1, 0), M4_NUT_AF, M4_NUT_H, y1 - yl + 1.0))
+    # T-bolts: clearance through the rib and plate, counterbore for the nyloc and a 5.5 nut driver
+    for yb in Y_BOLTS:
+        b = b.cut(round_cut((T_LIP, yb, Y_BOLT_Z), (1, 0, 0), 0, Y_NUT_SEAT - T_LIP + 0.1, M3_CLEAR))
+        b = b.cut(round_cut((Y_NUT_SEAT, yb, Y_BOLT_Z), (1, 0, 0), 0, 7.0, 11.0))
+    # the rear counterbore runs out the back end as a slot (no thin cusp where it breaks out)
+    b = b.cut(box(Y_NUT_SEAT, Y_NUT_SEAT + 7.0, Y_BOLTS[1], y1 + 0.5, Y_BOLT_Z - 5.5, Y_BOLT_Z + 5.5))
     # M3 switch clamp: through the outer wall, nut from the lever side (clear of the pin holes)
     b = b.cut(round_cut((20.6, 320.3, zc), (1, 0, 0), 0, 8.5, M3_CLEAR))
     b = b.cut(nut_trap((23.9, 320.3, zc), (1, 0, 0), (0, -1, 0), M3_NUT_AF, M3_NUT_H, 6.0))
@@ -218,6 +226,19 @@ def y_mount():
         b = b.cut(round_cut((14.0, h[1], h[2]), (-1, 0, 0), 0, 4.0, PIN_HOLE))
     print_rot = ((1, 0, 0), 90)               # y becomes print Z, front (lever) face on the bed
     return b, sw, print_rot
+
+
+def y_nut():
+    """T-nut carrier: slides into the slot chamber from the back end of the table. Two hex pockets
+    hold M3 hex bolt heads so they can't turn; its front face bears on the inside of the slot lips.
+    Modelled clamped (front face on the lips)."""
+    c0, c1 = Y_CARRIER
+    c = box(T_BACK + 0.2, T_LIP, c0, c1, T_CHAMBER[0] + GAP, T_CHAMBER[1] - GAP)
+    for yb in Y_BOLTS:
+        plane = cq.Plane(origin=(T_BACK + 0.2 - 0.1, yb, Y_BOLT_Z), xDir=(0, 1, 0), normal=(1, 0, 0))
+        c = c.cut(cq.Workplane(plane).polygon(6, M3_HEAD_AF / math.cos(math.radians(30))).extrude(M3_HEAD_H + 0.1))
+        c = c.cut(round_cut((T_BACK, yb, Y_BOLT_Z), (1, 0, 0), 0, T_LIP - T_BACK + 0.5, M3_CLEAR))
+    return c, ((0, 1, 0), 90)                  # front face (on the lips) on the bed, hex pockets up
 
 
 # ---------------------------------------------------------------- Z axis
@@ -255,7 +276,7 @@ def z_mount():
 
 
 MOUNTS = {"X": x_mount, "Y": y_mount, "Z": z_mount}
-EXTRA_PARTS = {}                    # second pieces (name: fn -> (solid, print_rot)), none at the moment
+EXTRA_PARTS = {"Y_nut": y_nut}      # second pieces (name: fn -> (solid, print_rot))
 
 
 def pin(d=PIN_D, length=PIN_LEN, chamfer=0.3):

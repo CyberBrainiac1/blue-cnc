@@ -178,31 +178,42 @@ function mountX(context is Context, id is Id, showSwitches is boolean)
 
 function mountY(context is Context, id is Id, showSwitches is boolean)
 {
-    // ---- Y: tongue in the T-slot on the side of the table's right-hand edge (x -2.72), slid in from
-    // the back end of the table until a tab under the table stops on the back end plate. One M4 x 12
-    // through a trapped nyloc pushes on the table side, pulling the tongue against the slot lips.
-        const y0 = 317.0; const y1 = 348.99; const yp = 333.0;   // lever face, table back end, pocket end
+    // ---- Y: clamped to the T-slot on the side of the table's right-hand edge (face x -2.72, lips
+    // 2.2 thick, chamber x -9.49..-4.92 x z 84.07..94.77) like T-slot hardware: a printed carrier in
+    // the chamber holds two M3 hex bolt heads; M3 nylocs outside pull the carrier against the inside
+    // of the lips and the bracket's flat face against the outside. Rib in the opening keeps it square;
+    // a tab under the table stops on the back face of the back end plate.
+        const y0 = 317.0; const y1 = 348.99; const yp = 331.0;   // lever face, table back end, pocket end
         const zc = 81.0; const zb = 68.6;
-        const yl = 340.0; const zl = 94.7;                         // M4 lock screw
+        const zt = 89.37;                                          // slot centre line
         const f = switchFrame(vec3(14.0 + SW_T / 2, y0, zc), vec3(0, -1, 0), vec3(0, 0, 1));
         makeMount(context, id + "Y", [
-                    function(c, i) { bx(c, i, -2.52, 7.0, y0, y1, 82.07, 99.5); },
+                    function(c, i) { bx(c, i, -2.72, 7.0, y0, y1, 82.07, 96.77); },
                     function(c, i) { bx(c, i, -1.62, 7.0, y0, y1, zb, 82.07); },
                     function(c, i) { bx(c, i, -6.0, -1.62, 339.19, y1, 70.0, 81.67); },
-                    function(c, i) { bx(c, i, -9.29, -5.02, y0, y1, 84.27, 94.57); },
-                    function(c, i) { bx(c, i, -5.02, -2.52, y0, y1, 86.57, 92.17); },
+                    function(c, i) { bx(c, i, -4.72, -2.72, y0, y1, 86.57, 92.17); },
                     function(c, i) { bx(c, i, 7.0, 14.0, y0, yp, zb, 94.0); },
                     function(c, i) { bx(c, i, 20.6, 28.6, y0, yp, zb, 94.0); },
                     function(c, i) { bx(c, i, 14.0, 20.6, y0, yp, zb, zc - SNUG_HALF); },
                     function(c, i) { bx(c, i, 14.0, 20.6, y0, yp, zc + SNUG_HALF, 94.0); }],
-                [function(c, i) { cy(c, i, vec3(-2.72, yl, zl), vec3(1, 0, 0), -0.5, 10.5, M4_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3(2.6, yl, zl), vec3(1, 0, 0), vec3(0, 1, 0), M4_NUT_AF, M4_NUT_H, y1 - yl + 1.0); },
+                [function(c, i) { cy(c, i, vec3(-4.92, 337.0, zt), vec3(1, 0, 0), 0, 7.02, M3_CLEAR); },
+                    function(c, i) { cy(c, i, vec3(2.0, 337.0, zt), vec3(1, 0, 0), 0, 7.0, 11.0); },
+                    function(c, i) { cy(c, i, vec3(-4.92, 344.5, zt), vec3(1, 0, 0), 0, 7.02, M3_CLEAR); },
+                    function(c, i) { cy(c, i, vec3(2.0, 344.5, zt), vec3(1, 0, 0), 0, 7.0, 11.0); },
+                    function(c, i) { bx(c, i, 2.0, 9.0, 344.5, y1 + 0.5, zt - 5.5, zt + 5.5); },
                     function(c, i) { cy(c, i, vec3(20.6, 320.3, zc), vec3(1, 0, 0), 0, 8.5, M3_CLEAR); },
                     function(c, i) { nutTrap(c, i, vec3(23.9, 320.3, zc), vec3(1, 0, 0), vec3(0, -1, 0), M3_NUT_AF, M3_NUT_H, 6.0); },
                     function(c, i) { cy(c, i, vec3(20.4, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
                     function(c, i) { cy(c, i, vec3(20.4, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
                     function(c, i) { cy(c, i, vec3(14.0, f.holes[0][1], f.holes[0][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); },
                     function(c, i) { cy(c, i, vec3(14.0, f.holes[1][1], f.holes[1][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); }], "Y");
+        // T-nut carrier, modelled clamped (front face on the inside of the lips)
+        makeMount(context, id + "Yn", [
+                    function(c, i) { bx(c, i, -9.29, -4.92, 331.0, y1, 84.27, 94.57); }],
+                [function(c, i) { hexPrism(c, i, vec3(-8.29, 337.0, zt), vec3(1, 0, 0), vec3(0, 1, 0), 5.8, 2.2); },
+                    function(c, i) { cy(c, i, vec3(-9.49, 337.0, zt), vec3(1, 0, 0), 0, 5.07, M3_CLEAR); },
+                    function(c, i) { hexPrism(c, i, vec3(-8.29, 344.5, zt), vec3(1, 0, 0), vec3(0, 1, 0), 5.8, 2.2); },
+                    function(c, i) { cy(c, i, vec3(-9.49, 344.5, zt), vec3(1, 0, 0), 0, 5.07, M3_CLEAR); }], "Y_nut");
         if (showSwitches)
             makeSwitch(context, id + "swY", f, "Y");
 }
@@ -268,8 +279,10 @@ function makeHardware(context is Context, id is Id)
     makeNut(context, id + "xln", vec3(27.15, 276.2, 337.5), vec3(1, 0, 0), vec3(0, 0, -1), 7.0, 5.0, 4.0, "nut_M4_X_lock");
     makeBolt(context, id + "xc", vec3(13.0 + SWX, 276.2, 376.6), vec3(0, 0, -1), 10, 3.0, 6.0, 2.0, "bolt_M3x10_X_switch");
     makeNut(context, id + "xcn", vec3(13.0 + SWX, 276.2, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), 5.5, 4.0, 3.0, "nut_M3_X_switch");
-    makeBolt(context, id + "yl", vec3(9.28, 340.0, 94.7), vec3(-1, 0, 0), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Y_lock");
-    makeNut(context, id + "yln", vec3(2.6, 340.0, 94.7), vec3(1, 0, 0), vec3(0, 1, 0), 7.0, 5.0, 4.0, "nut_M4_Y_lock");
+    makeBolt(context, id + "yl", vec3(-7.19, 337.0, 89.37), vec3(1, 0, 0), 16, 3.0, 5.5, 2.0, "bolt_M3x16_Y_clamp1");
+    makeNut(context, id + "yln", vec3(4.0, 337.0, 89.37), vec3(1, 0, 0), vec3(0, 1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_clamp1");
+    makeBolt(context, id + "yl2", vec3(-7.19, 344.5, 89.37), vec3(1, 0, 0), 16, 3.0, 5.5, 2.0, "bolt_M3x16_Y_clamp2");
+    makeNut(context, id + "yln2", vec3(4.0, 344.5, 89.37), vec3(1, 0, 0), vec3(0, 1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_clamp2");
     makeBolt(context, id + "yc", vec3(30.4, 320.3, 81.0), vec3(-1, 0, 0), 10, 3.0, 6.0, 2.0, "bolt_M3x10_Y_switch");
     makeNut(context, id + "ycn", vec3(23.9, 320.3, 81.0), vec3(1, 0, 0), vec3(0, -1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_switch");
     makeBolt(context, id + "zl", vec3(-310.8, 253.8, 381.74), vec3(0, 0, -1), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Z_lock");
