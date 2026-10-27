@@ -9,8 +9,8 @@ import cadquery as cq
 import frame_mounts as fm
 
 VIEWS = {  # (elevation, azimuth) chosen so the lever face is visible
-    "X": (28, -125, "X: saddle over the right gantry side plate\nlever faces -X (toward the carriage)"),
-    "Y": (22, -35, "Y: C-clip in the end-plate groove\nlever faces -Y (toward the gantry)"),
+    "X": (28, -55, "X: saddle over the LEFT gantry side plate\nlever faces +X (toward the carriage)"),
+    "Y": (22, -125, "Y: clamp on the back end of the right Y rail\nlever faces -Y (toward the gantry)"),
     "Z": (-28, -40, "Z: clip on the Z top plate (seen from below)\nlever faces down onto the spindle-holder ear"),
 }
 

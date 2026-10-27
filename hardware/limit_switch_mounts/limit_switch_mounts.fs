@@ -178,44 +178,31 @@ function mountX(context is Context, id is Id, showSwitches is boolean)
 
 function mountY(context is Context, id is Id, showSwitches is boolean)
 {
-    // ---- Y: two-piece clamp on the back end of the right Y rail (SBR16), against the back end plate.
-    // Body drops over the rail (arch on the shaft, leg past the left edge of the support);
-    // the jaw on the right edge of the support is pulled in by one M4 x 16.
-        const y0 = 298.99; const y1 = 318.99;             // y0 = lever face, rear bearing block back face at y -16.4
-        const xOut = -60.42; const xPk0 = -54.42; const xPk1 = -47.82; const xIn = -41.0;
-        const zc = 35.0; const zTop = 48.0;
-        const yb = 308.99; const zb = 30.0;                // M4 clamp screw
-        const f = switchFrame(vec3(-51.02, y0, zc), vec3(0, -1, 0), vec3(0, 0, 1));
+    // ---- Y: tongue in the T-slot on the side of the table's right-hand edge (x -2.72), slid in from
+    // the back end of the table until a tab under the table stops on the back end plate. One M4 x 12
+    // through a trapped nyloc pushes on the table side, pulling the tongue against the slot lips.
+        const y0 = 317.0; const y1 = 348.99; const yp = 333.0;   // lever face, table back end, pocket end
+        const zc = 81.0; const zb = 68.6;
+        const yl = 340.0; const zl = 94.7;                         // M4 lock screw
+        const f = switchFrame(vec3(14.0 + SW_T / 2, y0, zc), vec3(0, -1, 0), vec3(0, 0, 1));
         makeMount(context, id + "Y", [
-                    function(c, i) { bx(c, i, xOut, xPk0, y0, y1, 12.07, zTop); },
-                    function(c, i) { bx(c, i, xPk0, xIn, y0, y1, 17.07, zc - SNUG_HALF); },
-                    function(c, i) { bx(c, i, xPk0, xIn, y0, y1, zc + SNUG_HALF, zTop); },
-                    function(c, i) { bx(c, i, xPk1, xIn, y0, y1, 17.07, zTop); },
-                    function(c, i) { bx(c, i, xIn, -14.5, y0, y1, 36.28, zTop); },
-                    function(c, i) { bx(c, i, -22.6, -14.5, y0, y1, 21.07, zTop); }],
-                [function(c, i) { cy(c, i, vec3(-31.82, y0 - 0.5, 36.28), vec3(0, 1, 0), 0, 21.0, 16.2); },
-                    function(c, i) { bx(c, i, xPk0, xPk1, y0 - 0.5, y1 + 0.5, zc - SNUG_HALF, zc + SNUG_HALF); },
-                    function(c, i) { bx(c, i, xPk0, xPk1, y0 + SW_H + 0.3, y1 + 0.5, zc, zTop + 0.5); },
-                    function(c, i) { cy(c, i, vec3(-46.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
-                    function(c, i) { cy(c, i, vec3(-16.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
-                    function(c, i) { bx(c, i, -51.35, -42.35, y0 - 0.5, 304.05, 16.37, 22.37); },
-                    function(c, i) { bx(c, i, -21.35, -12.35, y0 - 0.5, 304.05, 16.37, 22.37); },
-                    function(c, i) { cy(c, i, vec3(-14.5, yb, zb), vec3(-1, 0, 0), 0, 9.0, M4_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3(-18.0, yb, zb), vec3(1, 0, 0), vec3(0, -1, 0), M4_NUT_AF, M4_NUT_H, yb - y0 + 1.0); },
-                    function(c, i) { cy(c, i, vec3(xOut, y0 + 3.4, zc), vec3(1, 0, 0), -0.5, 7.0, M3_CLEAR); },
-                    function(c, i) { nutTrap(c, i, vec3((xOut + xPk0) / 2, y0 + 3.4, zc), vec3(1, 0, 0), vec3(0, -1, 0), M3_NUT_AF, M3_NUT_H, 4.0); },
-                    function(c, i) { cy(c, i, vec3(xOut, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), -0.5, 6.5, PIN_ACCESS); },
-                    function(c, i) { cy(c, i, vec3(xOut, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), -0.5, 6.5, PIN_ACCESS); },
-                    function(c, i) { cy(c, i, vec3(xPk1, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), 0, PIN_LEN - (xPk1 - xOut), PIN_HOLE); },
-                    function(c, i) { cy(c, i, vec3(xPk1, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), 0, PIN_LEN - (xPk1 - xOut), PIN_HOLE); }], "Y");
-        // jaw: leg on the right edge of the support (x -9.32), pivot ridge at its top against the body
-        makeMount(context, id + "Yj", [
-                    function(c, i) { bx(c, i, -13.9, -5.5, y0, y1, 17.07, 38.0); },
-                    function(c, i) { bx(c, i, -9.22, -5.5, y0, y1, 12.07, 17.07); },
-                    function(c, i) { bx(c, i, -14.5, -13.9, y0, y1, 36.0, 38.0); }],
-                [function(c, i) { cy(c, i, vec3(-16.85, 304.05, 16.37), vec3(0, 0, 1), 0, 6.0, 9.0); },
-                    function(c, i) { bx(c, i, -21.35, -12.35, y0 - 0.5, 304.05, 16.37, 22.37); },
-                    function(c, i) { cy(c, i, vec3(-5.0, yb, zb), vec3(-1, 0, 0), 0, 10.0, M4_CLEAR); }], "Y_jaw");
+                    function(c, i) { bx(c, i, -2.52, 7.0, y0, y1, 82.07, 99.5); },
+                    function(c, i) { bx(c, i, -1.62, 7.0, y0, y1, zb, 82.07); },
+                    function(c, i) { bx(c, i, -6.0, -1.62, 339.19, y1, 70.0, 81.67); },
+                    function(c, i) { bx(c, i, -9.29, -5.02, y0, y1, 84.27, 94.57); },
+                    function(c, i) { bx(c, i, -5.02, -2.52, y0, y1, 86.57, 92.17); },
+                    function(c, i) { bx(c, i, 7.0, 14.0, y0, yp, zb, 94.0); },
+                    function(c, i) { bx(c, i, 20.6, 28.6, y0, yp, zb, 94.0); },
+                    function(c, i) { bx(c, i, 14.0, 20.6, y0, yp, zb, zc - SNUG_HALF); },
+                    function(c, i) { bx(c, i, 14.0, 20.6, y0, yp, zc + SNUG_HALF, 94.0); }],
+                [function(c, i) { cy(c, i, vec3(-2.72, yl, zl), vec3(1, 0, 0), -0.5, 10.5, M4_CLEAR); },
+                    function(c, i) { nutTrap(c, i, vec3(2.6, yl, zl), vec3(1, 0, 0), vec3(0, 1, 0), M4_NUT_AF, M4_NUT_H, y1 - yl + 1.0); },
+                    function(c, i) { cy(c, i, vec3(20.6, 320.3, zc), vec3(1, 0, 0), 0, 8.5, M3_CLEAR); },
+                    function(c, i) { nutTrap(c, i, vec3(23.9, 320.3, zc), vec3(1, 0, 0), vec3(0, -1, 0), M3_NUT_AF, M3_NUT_H, 6.0); },
+                    function(c, i) { cy(c, i, vec3(20.4, f.holes[0][1], f.holes[0][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
+                    function(c, i) { cy(c, i, vec3(20.4, f.holes[1][1], f.holes[1][2]), vec3(1, 0, 0), 0, 8.5, PIN_ACCESS); },
+                    function(c, i) { cy(c, i, vec3(14.0, f.holes[0][1], f.holes[0][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); },
+                    function(c, i) { cy(c, i, vec3(14.0, f.holes[1][1], f.holes[1][2]), vec3(-1, 0, 0), 0, 4.0, PIN_HOLE); }], "Y");
         if (showSwitches)
             makeSwitch(context, id + "swY", f, "Y");
 }
@@ -281,10 +268,10 @@ function makeHardware(context is Context, id is Id)
     makeNut(context, id + "xln", vec3(27.15, 276.2, 337.5), vec3(1, 0, 0), vec3(0, 0, -1), 7.0, 5.0, 4.0, "nut_M4_X_lock");
     makeBolt(context, id + "xc", vec3(13.0 + SWX, 276.2, 376.6), vec3(0, 0, -1), 10, 3.0, 6.0, 2.0, "bolt_M3x10_X_switch");
     makeNut(context, id + "xcn", vec3(13.0 + SWX, 276.2, 370.0), vec3(0, 0, 1), vec3(-1, 0, 0), 5.5, 4.0, 3.0, "nut_M3_X_switch");
-    makeBolt(context, id + "yl", vec3(-5.5, 308.99, 30.0), vec3(-1, 0, 0), 16, 4.0, 7.0, 4.0, "bolt_M4x16_Y_clamp");
-    makeNut(context, id + "yln", vec3(-18.0, 308.99, 30.0), vec3(1, 0, 0), vec3(0, -1, 0), 7.0, 5.0, 4.0, "nut_M4_Y_clamp");
-    makeBolt(context, id + "yc", vec3(-64.22, 302.39, 35.0), vec3(1, 0, 0), 10, 3.0, 6.0, 2.0, "bolt_M3x10_Y_switch");
-    makeNut(context, id + "ycn", vec3(-57.42, 302.39, 35.0), vec3(1, 0, 0), vec3(0, -1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_switch");
+    makeBolt(context, id + "yl", vec3(9.28, 340.0, 94.7), vec3(-1, 0, 0), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Y_lock");
+    makeNut(context, id + "yln", vec3(2.6, 340.0, 94.7), vec3(1, 0, 0), vec3(0, 1, 0), 7.0, 5.0, 4.0, "nut_M4_Y_lock");
+    makeBolt(context, id + "yc", vec3(30.4, 320.3, 81.0), vec3(-1, 0, 0), 10, 3.0, 6.0, 2.0, "bolt_M3x10_Y_switch");
+    makeNut(context, id + "ycn", vec3(23.9, 320.3, 81.0), vec3(1, 0, 0), vec3(0, -1, 0), 5.5, 4.0, 3.0, "nut_M3_Y_switch");
     makeBolt(context, id + "zl", vec3(-310.8, 253.8, 381.74), vec3(0, 0, -1), 12, 4.0, 7.0, 4.0, "bolt_M4x12_Z_lock");
     makeNut(context, id + "zln", vec3(-310.8, 253.8, 374.0), vec3(0, 0, 1), vec3(-1, 0, 0), 7.0, 5.0, 4.0, "nut_M4_Z_lock");
     makeBolt(context, id + "zc", vec3(-293.6, 153.0, 362.0), vec3(-1, 0, 0), 12, 3.0, 6.0, 2.0, "bolt_M3x12_Z_switch");
@@ -292,8 +279,8 @@ function makeHardware(context is Context, id is Id)
     // printed pins through the switch holes (start on the face they are pushed in from)
     makePin(context, id + "px1", vec3(16.8 + SWX, 271.45, 374.8), vec3(0, 0, -1), "pin_X1");
     makePin(context, id + "px2", vec3(16.8 + SWX, 280.95, 374.8), vec3(0, 0, -1), "pin_X2");
-    makePin(context, id + "py1", vec3(-60.42, 306.29, 30.25), vec3(1, 0, 0), "pin_Y1");
-    makePin(context, id + "py2", vec3(-60.42, 306.29, 39.75), vec3(1, 0, 0), "pin_Y2");
+    makePin(context, id + "py1", vec3(28.6, 324.3, 76.25), vec3(-1, 0, 0), "pin_Y1");
+    makePin(context, id + "py2", vec3(28.6, 324.3, 85.75), vec3(-1, 0, 0), "pin_Y2");
     makePin(context, id + "pz1", vec3(-295.8, 148.25, 366.8), vec3(-1, 0, 0), "pin_Z1");
     makePin(context, id + "pz2", vec3(-295.8, 157.75, 366.8), vec3(-1, 0, 0), "pin_Z2");
 }

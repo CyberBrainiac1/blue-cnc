@@ -3,8 +3,8 @@ KW11 / 10T85 / SS-5GL micro switches with the wire lever cut to ~16.5 mm.
 
 Nothing sits on the rails or rods and nothing needs drilling. Hardware is only what's on
 hand: M3 hex-head bolts, M4 socket-head screws and nyloc nuts for both.
-  - X and Z clip onto a plate edge and are locked by one M4 socket screw running through a
-    trapped M4 nyloc nut; its tip presses the aluminium. Y clamps the Y rail with one M4.
+  - Each bracket is locked by one M4 socket screw running through a trapped M4 nyloc nut; its
+    tip presses the aluminium (X and Z clip onto a plate edge, Y sits in the table's side T-slot).
   - Each switch sits in a pocket between two end walls and is clamped by
     one M3 hex bolt running through a trapped M3 nyloc nut; its tip presses the switch body.
     The switch's own 2.35 mm holes are not used.
@@ -12,9 +12,9 @@ hand: M3 hex-head bolts, M4 socket-head screws and nyloc nuts for both.
   X (home -X, left): saddle over the top edge of the LEFT gantry side plate. The left end of
      the X carriage top plate (Z motor plate) hits the lever. Its inner jaw sits over the end of
      the upper 20 mm X rod, so it locates itself. Drawn in the right-side frame and mirrored.
-  Y (home +Y, back/motor end): two-piece clamp on the back end of the right Y rail (SBR16),
-     against the back end plate. The body drops over the rail, a jaw on the right edge of the
-     rail support is pulled in by one M4. The rear right bearing block hits the lever.
+  Y (home +Y, back/motor end): a tongue in the T-slot on the side of the table's right-hand
+     edge, slid in from the back end until it stops on the back end plate, locked by one M4.
+     The back edge of the gantry's right side plate hits the lever.
   Z (home +Z, up): clip on the right edge of the Z top plate, arm forward so the switch
      hangs over the spindle holder's right clamp ear, which hits the lever.
      A fork on top slides onto the Z rod's top screw head and stops there.
@@ -60,7 +60,7 @@ Z_HEAD_R = 4.25 + 0.1
 HARDWARE = {
     ("X", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
     ("X", "switch clamp"): ("M3 hex head", 10, "M3 nyloc"),
-    ("Y", "rail clamp"): ("M4 socket head", 16, "M4 nyloc"),
+    ("Y", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
     ("Y", "switch clamp"): ("M3 hex head", 10, "M3 nyloc"),
     ("Z", "bracket lock"): ("M4 socket head", 12, "M4 nyloc"),
     ("Z", "switch clamp"): ("M3 hex head", 12, "M3 nyloc"),
@@ -169,79 +169,55 @@ def x_mount():
 
 
 # ---------------------------------------------------------------- Y axis
-# Right Y rail (SBR16): 16 mm shaft on a support 45 mm wide at the base, on the base plate.
-# Both gantry bearing blocks use the whole rail, so the clamp takes the last 20 mm at the back
-# (Y travel about 19 mm shorter). It butts against the back end plate, which takes the load.
-Y_SHAFT = (-31.82, 36.28)          # shaft centre (x, z), radius 8
-Y_FLANGE = (-54.32, -9.32, 16.87)  # support base: left edge, right edge, top (bottom on the base at 11.87)
-Y_NECK = (-40.82, -22.82, 20.87)   # support neck above the base flange: left, right, top
-Y_BASE_TOP = 11.87
-Y_END_PLATE = 319.09               # front face of the back end plate, where the rail ends
-Y_LEN = 20.0                       # clamp length along the rail
-Y_FACE = Y_END_PLATE - 0.1 - Y_LEN  # lever face / front of the bracket: the rear bearing block's back
-                                   # face reaches it at y -16.4, so the switch trips at about y -17.9
-Y_RAIL_SCREWS = ((-46.85, 304.05), (-16.85, 304.05))   # M5 heads (8.5 x 5) holding the rail down
-Y_TOP = 48.0                       # under the gantry cross bar (z 55.6), and low enough to slide in over the
-                                   # shaft under the table (shaft top 44.28 to table 81.87 = 37.6 mm; body 35.9)
-Y_BOLT = (Y_FACE + Y_LEN / 2, 30.0)  # M4 x 16 clamp screw (y, z), along -x from the jaw into the body
-Y_JAW_GAP = 0.6                    # body / jaw joint gap the screw closes (jaw pivots on a ridge at the top)
+# The table's right-hand edge profile has a T-slot along its side face (x -2.72): 6 mm opening
+# (z 86.37..92.37), 2.2 mm lips, chamber x -9.49..-4.92 x z 84.07..94.77. It runs the full table
+# length and is open at the back end (y 349.09). The bracket's tongue slides into it from the back.
+T_FACE, T_LIP, T_BACK = -2.72, -4.92, -9.49       # table side face, inside of the lips, back of the chamber
+T_OPEN = (86.37, 92.37)                           # slot opening (z)
+T_CHAMBER = (84.07, 94.77)                        # chamber (z)
+T_TABLE = (81.87, 96.97, 349.09)                  # table underside, top, back end
+Y_END_PLATE = (319.09, 339.09, -1.82, 81.87)      # back end plate: front, back face, right end, top
+Y_FACE = 317.0                                    # lever face / front of the bracket (the gantry's right
+                                                  # side plate back edge is at 314.19 when Y = 0)
+Y_ZC = 81.0                                       # switch centre height
+Y_LOCK = (340.0, 94.7)                            # M4 lock screw (y, z): its tip presses the table side face
+                                                  # in the solid band above the slot
 
 
 def y_mount():
-    """Clamp body on the back end of the right Y rail. Drops straight down over the rail: an arch
-    over the shaft, a leg down past the left edge of the support, and a block right of the shaft
-    that the jaw is pulled against. Switch in a pocket left of the shaft, lever facing -y."""
-    y0, y1 = Y_FACE, Y_FACE + Y_LEN
-    sx, sz = Y_SHAFT
-    fl, fr, ft = Y_FLANGE
-    nl, nr, nt = Y_NECK
-    out0, pk0, pk1, in1 = fl - 0.1 - 6.0, fl - 0.1, fl - 0.1 + 0.2 + ss5gl.T, nl - 0.18
-    zc = 35.0                                                     # switch centre height
-    b = box(out0, pk0, y0, y1, Y_BASE_TOP + 0.2, Y_TOP)          # left leg / outer wall of the pocket
-    b = b.union(box(pk0, in1, y0, y1, ft + 0.2, zc - SNUG_HALF))  # pocket floor (on the support base)
-    b = b.union(box(pk0, in1, y0, y1, zc + SNUG_HALF, Y_TOP))     # pocket roof
-    b = b.union(box(pk1, in1, y0, y1, ft + 0.2, Y_TOP))           # inner wall (pins end here)
-    b = b.union(box(in1, -14.5, y0, y1, sz, Y_TOP))               # arch over the shaft
-    b = b.union(box(nr + 0.22, -14.5, y0, y1, nt + 0.2, Y_TOP))   # block right of the shaft
-    b = b.cut(round_cut((sx, y0 - 0.5, sz), (0, 1, 0), 0, Y_LEN + 1.0, 2 * (8.0 + 0.1)))
-    b = b.cut(box(pk0, pk1, y0 - 0.5, y1 + 0.5, zc - SNUG_HALF, zc + SNUG_HALF))   # switch pocket
-    # wires: the back end sits against the end plate, so they leave through a slot in the roof
-    b = b.cut(box(pk0, pk1, y0 + ss5gl.H + 0.3, y1 + 0.5, zc, Y_TOP + 0.5))
-    for hx, hy in Y_RAIL_SCREWS:           # recesses over the rail's M5 screw heads, open to the front
-        b = b.cut(round_cut((hx, hy, ft - 0.5), (0, 0, 1), 0, 6.0, 9.0))
-        b = b.cut(box(hx - 4.5, hx + 4.5, y0 - 0.5, hy, ft - 0.5, ft + 5.5))
-    # clamp screw: nyloc trapped in the block, pushed in from the front (-y) face
-    yb, zb = Y_BOLT
-    b = b.cut(round_cut((-14.5, yb, zb), (-1, 0, 0), 0, 9.0, M4_CLEAR))
-    b = b.cut(nut_trap((-18.0, yb, zb), (1, 0, 0), (0, -1, 0), M4_NUT_AF, M4_NUT_H, yb - y0 + 1.0))
-    # M3 switch clamp: through the outer wall from the left, nut from the lever end (clear of the pins)
-    b = b.cut(round_cut((out0, y0 + 3.4, zc), (1, 0, 0), -0.5, 7.0, M3_CLEAR))
-    b = b.cut(nut_trap(((out0 + pk0) / 2, y0 + 3.4, zc), (1, 0, 0), (0, -1, 0), M3_NUT_AF, M3_NUT_H, 4.0))
-    sw = SwitchPlacement(face=((pk0 + 0.2 + pk1) / 2, y0, zc), n=(0, -1, 0), a=(0, 0, 1))
-    for h in sw.holes():   # pins: pushed in from the left through the outer wall and the switch into the inner wall
-        b = b.cut(round_cut((out0, h[1], h[2]), (1, 0, 0), -0.5, 6.5, PIN_ACCESS))
-        b = b.cut(round_cut((pk1, h[1], h[2]), (1, 0, 0), 0, PIN_LEN - (pk1 - out0), PIN_HOLE))
-    print_rot = ((1, 0, 0), 90)               # y becomes print Z, front (lever) end on the bed
+    """Y bracket on the table's right-hand edge: a tongue in the side T-slot, slid in from the back
+    end of the table until a tab under the table stops on the back face of the back end plate.
+    One M4 x 12 through a trapped nyloc pushes on the table side, pulling the tongue tight against
+    the slot lips. The switch sits where the gantry's right side plate hits it (lever facing -y)."""
+    y0, y1 = Y_FACE, T_TABLE[2] - 0.1
+    ep_front, ep_back, ep_end, ep_top = Y_END_PLATE
+    zc = Y_ZC
+    zb = 68.6                                                      # above the gantry's bottom beam (z 67.8)
+    b = box(T_FACE + GAP, 7.0, y0, y1, T_TABLE[0] + 0.2, 99.5)     # plate along the table side
+    b = b.union(box(ep_end + GAP, 7.0, y0, y1, zb, T_TABLE[0] + 0.2))   # below the table, right of the end plate
+    b = b.union(box(-6.0, ep_end + GAP, ep_back + 0.1, y1, 70.0, T_TABLE[0] - 0.2))   # stop tab behind the end plate
+    b = b.union(box(T_BACK + GAP, T_LIP - 0.1, y0, y1, T_CHAMBER[0] + GAP, T_CHAMBER[1] - GAP))   # tongue
+    b = b.union(box(T_LIP - 0.1, T_FACE + GAP, y0, y1, T_OPEN[0] + GAP, T_OPEN[1] - GAP))        # neck
+    yp = 333.0                                                     # switch pocket ends here; lock screw behind it
+    b = b.union(box(7.0, 14.0, y0, yp, zb, 94.0))                  # backing behind the switch
+    # switch pocket: outer wall carrying the clamp, end walls (front edge flush with the switch's
+    # lever face). The terminal side is left open for soldered wires.
+    b = b.union(box(20.6, 28.6, y0, yp, zb, 94.0))
+    b = b.union(box(14.0, 20.6, y0, yp, zb, zc - SNUG_HALF))
+    b = b.union(box(14.0, 20.6, y0, yp, zc + SNUG_HALF, 94.0))
+    # M4 lock: along -x through the plate, nyloc pushed in from the back face
+    yl, zl = Y_LOCK
+    b = b.cut(round_cut((T_FACE, yl, zl), (1, 0, 0), -0.5, 10.5, M4_CLEAR))
+    b = b.cut(nut_trap((2.6, yl, zl), (1, 0, 0), (0, 1, 0), M4_NUT_AF, M4_NUT_H, y1 - yl + 1.0))
+    # M3 switch clamp: through the outer wall, nut from the lever side (clear of the pin holes)
+    b = b.cut(round_cut((20.6, 320.3, zc), (1, 0, 0), 0, 8.5, M3_CLEAR))
+    b = b.cut(nut_trap((23.9, 320.3, zc), (1, 0, 0), (0, -1, 0), M3_NUT_AF, M3_NUT_H, 6.0))
+    sw = SwitchPlacement(face=(14.0 + ss5gl.T / 2, y0, zc), n=(0, -1, 0), a=(0, 0, 1))
+    for h in sw.holes():   # pins: pushed in from outside through the outer wall and the switch into the backing
+        b = b.cut(round_cut((20.4, h[1], h[2]), (1, 0, 0), 0, 8.5, PIN_ACCESS))
+        b = b.cut(round_cut((14.0, h[1], h[2]), (-1, 0, 0), 0, 4.0, PIN_HOLE))
+    print_rot = ((1, 0, 0), 90)               # y becomes print Z, front (lever) face on the bed
     return b, sw, print_rot
-
-
-def y_jaw():
-    """Right jaw: its leg bears on the right edge of the rail support; one M4 x 16 from the right
-    pulls it toward the body. A ridge at its top touches the body first, so the screw levers the
-    leg in against the support."""
-    y0, y1 = Y_FACE, Y_FACE + Y_LEN
-    fl, fr, ft = Y_FLANGE
-    j0, j1 = -14.5 + Y_JAW_GAP, -5.5
-    jtop = 38.0
-    j = box(j0, j1, y0, y1, ft + 0.2, jtop)                        # above the support base
-    j = j.union(box(fr + 0.1, j1, y0, y1, Y_BASE_TOP + 0.2, ft + 0.2))   # leg down past its edge
-    j = j.union(box(-14.5, j0, y0, y1, jtop - 2.0, jtop))         # pivot ridge
-    hx, hy = Y_RAIL_SCREWS[1]
-    j = j.cut(round_cut((hx, hy, ft - 0.5), (0, 0, 1), 0, 6.0, 9.0))   # over the rail screw head
-    j = j.cut(box(hx - 4.5, hx + 4.5, y0 - 0.5, hy, ft - 0.5, ft + 5.5))
-    yb, zb = Y_BOLT
-    j = j.cut(round_cut((j1 + 0.5, yb, zb), (-1, 0, 0), 0, 10.0, M4_CLEAR))
-    return j, ((1, 0, 0), 90)
 
 
 # ---------------------------------------------------------------- Z axis
@@ -279,7 +255,7 @@ def z_mount():
 
 
 MOUNTS = {"X": x_mount, "Y": y_mount, "Z": z_mount}
-EXTRA_PARTS = {"Y_jaw": y_jaw}      # second pieces (name: fn -> (solid, print_rot))
+EXTRA_PARTS = {}                    # second pieces (name: fn -> (solid, print_rot)), none at the moment
 
 
 def pin(d=PIN_D, length=PIN_LEN, chamfer=0.3):
