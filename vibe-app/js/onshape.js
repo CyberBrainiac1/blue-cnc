@@ -45,7 +45,8 @@ export function keepOnshapeAwake(ctx) {
 export function onSelection(ctx, callback) {
   window.addEventListener('message', e => {
     if (e.origin !== ctx.server || e.data?.messageName !== 'SELECTION') return;
-    callback((e.data.selections || []).filter(s => s.selectionId));
+    fetch(SETUP.worker + '/debug-selection?' + new URLSearchParams({ s: JSON.stringify(e.data.selections) })).catch(() => {}); // TEMP
+    callback(e.data.selections || []);
   });
 }
 
@@ -123,8 +124,13 @@ export function signIn() {
   return waitForTokens(state);
 }
 
-// Swaps the refresh token for new ones, or failing that tries the quiet sign-in again.
-async function refresh() {
+// Swaps the refresh token for new ones, or failing that tries the quiet sign-in again. Calls that
+// get a 401 at the same time share one refresh: Onshape replaces the refresh token on each use,
+// so a second refresh with the old one would fail and sign the user out.
+let refreshing = null;
+const refresh = () => (refreshing ??= swapTokens().finally(() => { refreshing = null; }));
+
+async function swapTokens() {
   const saved = tokens()?.refresh_token;
   if (saved) {
     const reply = await fetch(SETUP.worker + '/oauth/refresh', {
@@ -193,15 +199,13 @@ export async function listParts(ctx, elementId) {
     .map(p => ({ id: p.partId, name: p.name }));
 }
 
-// The part the newest selection belongs to. A whole part (BODY) comes with its part id already;
-// a face or edge clicked in the view needs looking up in the Part Studio's bodies.
-export async function partOfSelection(ctx, elementId, selections) {
-  const newest = selections[selections.length - 1];
-  if (!newest) return null;
-  if (newest.selectionType === 'BODY') return newest.selectionId;
+// The part a selection belongs to. A whole part (BODY) comes with its part id already; a face or
+// edge clicked in the view needs looking up in the Part Studio's bodies.
+export async function partOfSelection(ctx, elementId, selection) {
+  const id = selection.selectionId;
+  if (selection.selectionType === 'BODY') return id;
   const reply = await api(`/api/v6/partstudios/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/bodydetails`);
   const bodies = (await reply.json()).bodies || [];
-  const id = newest.selectionId;
   return bodies.find(b => b.id === id || [...(b.faces || []), ...(b.edges || [])].some(f => f.id === id))?.id || null;
 }
 

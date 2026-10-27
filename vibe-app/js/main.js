@@ -1,7 +1,7 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
 import { toolpath } from './toolpath.js';
 import { drawPath } from './preview.js';
-import * as onshape from './onshape.js?v=5';
+import * as onshape from './onshape.js?v=6';
 import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
@@ -337,48 +337,59 @@ function remember(what, value) {
 
 // In the side panel the Part Studio is the one it's open next to, so there's no studio to pick.
 const studioId = () => (onshapeCtx.panel ? onshapeCtx.elementId : $('partStudio').value);
-let studioParts = [];
 
+// The dropdown is the list of parts. Whatever was picked last in this document loads straight
+// away, so Make toolpath is ready when the page opens.
 async function showParts() {
   $('partNote').textContent = 'Looking for parts...';
   try {
-    const parts = studioParts = await onshape.listParts(onshapeCtx, studioId());
+    const parts = await onshape.listParts(onshapeCtx, studioId());
     $('partList').replaceChildren(...parts.map(p => new Option(p.name, p.id)));
     $('partList').hidden = $('partUse').hidden = !parts.length;
-    const last = remember('part');
-    if (parts.some(p => p.id === last)) $('partList').value = last;
-    if (!parts.length) $('partNote').textContent = 'That Part Studio has no parts.';
-    else $('partNote').textContent = onshapeCtx.panel ? 'Click a part in the Part Studio, or pick it here.' : '';
+    if (!parts.length) return void ($('partNote').textContent = 'That Part Studio has no parts.');
+    $('partNote').textContent = onshapeCtx.panel ? 'Click a part in the Part Studio, or pick it here.' : '';
+    const last = parts.find(p => p.id === remember('part'));
+    if (lastSelection.length) useSelection(lastSelection);
+    else if (last) readOnshapePart(last.id, last.name);
   } catch (err) {
     if (err instanceof onshape.SignInNeeded) askToSignIn();
     else $('partNote').textContent = err.message;
   }
 }
 
+// Only the newest request counts, so a slow read can't replace the part picked after it.
+let loadedId = null, reads = 0;
 async function readOnshapePart(id, name) {
+  const mine = ++reads;
   remember('part', id);
   $('partList').value = id;
   $('partNote').textContent = `Reading ${name}...`;
   try {
-    usePart(name, await onshape.readPart(onshapeCtx, studioId(), id));
+    const data = await onshape.readPart(onshapeCtx, studioId(), id);
+    if (mine !== reads) return;
+    loadedId = id;
+    usePart(name, data);
   } catch (err) {
-    $('partNote').textContent = err.message;
+    if (mine === reads) $('partNote').textContent = err.message;
   }
 }
 
-// Clicking a part, or any face or edge of it, in the Part Studio picks that part.
-let selected = null;
+// Clicking a part, or any face or edge of it, in the Part Studio picks that part. Onshape sends
+// the whole selection, oldest first. One that arrives before the parts are listed waits for them.
+let lastSelection = [], picks = 0;
 async function useSelection(selections) {
-  if (!selections.length || !onshape.signedIn()) return;
+  lastSelection = selections;
+  const newest = selections.at(-1);
+  if (!newest || !$('partList').options.length) return;
+  const mine = ++picks;
   try {
-    const id = await onshape.partOfSelection(onshapeCtx, studioId(), selections);
-    if (!id || id === selected) return;
-    selected = id;
-    if (!studioParts.some(p => p.id === id)) studioParts = await onshape.listParts(onshapeCtx, studioId());
-    const p = studioParts.find(p => p.id === id);
-    if (p) readOnshapePart(p.id, p.name);
+    const id = await onshape.partOfSelection(onshapeCtx, studioId(), newest);
+    if (mine !== picks || id === loadedId) return;
+    const option = [...$('partList').options].find(o => o.value === id);
+    if (option) readOnshapePart(option.value, option.text);
+    else $('partNote').textContent = 'That isn\'t a solid part. Click a part, or one of its faces.';
   } catch (err) {
-    $('partNote').textContent = err.message;
+    if (mine === picks) $('partNote').textContent = err.message;
   }
 }
 
@@ -390,7 +401,6 @@ $('partList').addEventListener('change', () => remember('part', $('partList').va
 
 $('partUse').addEventListener('click', () => {
   const option = $('partList').selectedOptions[0];
-  selected = option.value;
   readOnshapePart(option.value, option.text);
 });
 
