@@ -1,11 +1,11 @@
-// The Onshape side of GRBL Prep: sign in, list the NC files imported into the open document,
-// read one, and save the converted file back as a new tab.
+// The Onshape side of GRBL Prep: sign in, read a part from a Part Studio, list the NC files
+// imported into the open document, and save a GRBL file back as a new tab.
 
 // Filled in once the app is registered in Onshape and the Worker is running.
 // The client ID isn't a secret. The client secret only ever lives in the Worker.
 export const SETUP = {
-  clientId: '',
-  worker: '', // e.g. https://grbl-prep-onshape.yourname.workers.dev
+  clientId: 'X5HZCQIYICAK4VNX5XQHEZEMEYT622MX52CU7QA=',
+  worker: 'https://grbl-prep-onshape.emmadipranav.workers.dev',
 };
 
 const NC_FILE = /\.(nc|ngc|gcode|tap|txt|cnc|g|ncl)$/i;

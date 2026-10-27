@@ -4,6 +4,6 @@ compatibility_date = "2026-09-01"
 
 [vars]
 APP_URL = "https://cyberbrainiac1.github.io/blue-cnc/vibe-app/"
-# CLIENT_ID goes here once the app is registered in Onshape's developer portal.
-CLIENT_ID = ""
+# The OAuth client ID from Onshape's developer portal. It isn't a secret.
+CLIENT_ID = "X5HZCQIYICAK4VNX5XQHEZEMEYT622MX52CU7QA="
 # CLIENT_SECRET is not in this file. Add it as a secret: npx wrangler secret put CLIENT_SECRET
