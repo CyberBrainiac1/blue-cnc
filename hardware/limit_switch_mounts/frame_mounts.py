@@ -189,6 +189,7 @@ Y_BOLTS = (337.0, 344.5)                          # M3 x 16 T-bolts (y), on the 
 Y_BOLT_Z = (T_OPEN[0] + T_OPEN[1]) / 2
 Y_CARRIER = (331.0, T_TABLE[2] - 0.1)             # carrier length along the slot
 M3_HEAD_AF, M3_HEAD_H = 5.8, 2.1                  # pocket for an M3 hex head (5.5 x 2.0)
+Y_NUT_GAP = 0.4                                   # carrier clearance in the chamber, per side (0.2 was too tight)
 Y_NUT_SEAT = 2.0                                  # x of the nyloc seat (bottom of the counterbore)
 
 
@@ -233,9 +234,9 @@ def y_nut():
     hold M3 hex bolt heads so they can't turn; its front face bears on the inside of the slot lips.
     Modelled clamped (front face on the lips)."""
     c0, c1 = Y_CARRIER
-    c = box(T_BACK + 0.2, T_LIP, c0, c1, T_CHAMBER[0] + GAP, T_CHAMBER[1] - GAP)
+    c = box(T_BACK + Y_NUT_GAP, T_LIP, c0, c1, T_CHAMBER[0] + Y_NUT_GAP, T_CHAMBER[1] - Y_NUT_GAP)
     for yb in Y_BOLTS:
-        plane = cq.Plane(origin=(T_BACK + 0.2 - 0.1, yb, Y_BOLT_Z), xDir=(0, 1, 0), normal=(1, 0, 0))
+        plane = cq.Plane(origin=(T_BACK + Y_NUT_GAP - 0.1, yb, Y_BOLT_Z), xDir=(0, 1, 0), normal=(1, 0, 0))
         c = c.cut(cq.Workplane(plane).polygon(6, M3_HEAD_AF / math.cos(math.radians(30))).extrude(M3_HEAD_H + 0.1))
         c = c.cut(round_cut((T_BACK, yb, Y_BOLT_Z), (1, 0, 0), 0, T_LIP - T_BACK + 0.5, M3_CLEAR))
     return c, ((0, 1, 0), 90)                  # front face (on the lips) on the bed, hex pockets up
