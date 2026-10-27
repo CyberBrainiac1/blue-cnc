@@ -44,6 +44,7 @@ export function keepOnshapeAwake(ctx) {
 export function onSelection(ctx, callback) {
   window.addEventListener('message', e => {
     if (e.origin !== ctx.server || e.data?.messageName !== 'SELECTION') return;
+    fetch(SETUP.worker + '/debug-selection?' + new URLSearchParams({ s: JSON.stringify(e.data.selections) })).catch(() => {}); // TEMP
     callback((e.data.selections || []).map(s => s.selectionId).filter(Boolean));
   });
 }
@@ -197,9 +198,12 @@ export async function listParts(ctx, elementId) {
 export async function partOfSelection(ctx, elementId, ids) {
   const reply = await api(`/api/v6/partstudios/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/bodydetails`);
   const bodies = (await reply.json()).bodies || [];
-  return bodies.find(b => ids.includes(b.id))?.id
-    || bodies.find(b => [...(b.faces || []), ...(b.edges || [])].some(f => ids.includes(f.id)))?.id
-    || null;
+  const owner = id => bodies.find(b => b.id === id || [...(b.faces || []), ...(b.edges || [])].some(f => f.id === id));
+  // the newest selection is last
+  for (const id of [...ids].reverse()) {
+    if (owner(id)) return owner(id).id;
+  }
+  return null;
 }
 
 // The faces of a part and the points along its edges, which is all the CAM needs.
