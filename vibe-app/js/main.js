@@ -70,7 +70,7 @@ function showTab(cam) {
   $('camPanel').hidden = !cam;
   $('gcodePanel').hidden = cam;
   // the G-code tab has one step before the preview, cutting a part has three
-  document.querySelectorAll('.step').forEach((el, i) => { el.textContent = `${(cam ? 4 : 2) + i}.`; });
+  document.querySelectorAll('#previewPanel .step, #sendPanel .step').forEach((el, i) => { el.textContent = (cam ? 4 : 2) + i; });
 }
 
 $('tabCam').addEventListener('click', () => showTab(true));
@@ -317,10 +317,14 @@ function updateButtons() {
   $('stop').disabled = !connected;
 }
 
+// colours the status pill; states not listed stay grey
+const PILL = { Idle: 'ready', Run: 'running', Jog: 'running', Home: 'running', Hold: 'paused', Door: 'paused', Alarm: 'alarm' };
+
 function showState(s) {
   const was = machineState;
   machineState = s.state;
   $('state').textContent = STATES[s.state] || s.state;
+  $('state').dataset.state = PILL[s.state] || '';
   const p = s.WPos || s.MPos;
   if (p) {
     // GRBL sends machine position plus a work offset every so often
@@ -368,6 +372,7 @@ async function connect() {
     sender = null;
     machineState = null;
     $('state').textContent = 'Not connected';
+    $('state').dataset.state = '';
     $('where').textContent = '';
     updateButtons();
   };

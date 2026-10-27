@@ -21,16 +21,16 @@
       </div>
 
       <div id="camPanel" role="tabpanel">
-        <h2>1. Pick the part</h2>
+        <h2><span class="step">1</span>Pick the part</h2>
         <div id="partOnshape" hidden>
-          <div class="row">
+          <div class="row pick">
             <button id="partSignIn">Sign in to Onshape</button>
             <select id="partStudio" hidden></select>
             <select id="partList" hidden></select>
             <button id="partUse" hidden>Use this part</button>
           </div>
         </div>
-        <div class="row">
+        <div class="row minor">
           <span class="small" id="sampleLabel">Or try a sample plate:</span>
           <select id="sampleList"></select>
           <button id="sampleUse" class="quiet">Use this plate</button>
@@ -38,8 +38,8 @@
         <p id="partNote" class="small"></p>
         <p id="partName" class="picked" hidden></p>
 
-        <h2>2. Material and bit</h2>
-        <div class="row">
+        <h2><span class="step">2</span>Material and bit</h2>
+        <div class="pair">
           <label>Material <select id="material"></select></label>
           <label>Bit <select id="bit"></select></label>
         </div>
@@ -62,7 +62,7 @@
           </form>
         </details>
 
-        <h2>3. Make the toolpath</h2>
+        <h2><span class="step">3</span>Make the toolpath</h2>
         <div class="row">
           <button id="generate" disabled>Make toolpath</button>
           <span id="generateNote" class="small"></span>
@@ -82,14 +82,14 @@
       </div>
 
       <div id="gcodePanel" role="tabpanel" hidden>
-        <h2>1. Your G-code</h2>
+        <h2><span class="step">1</span>Your G-code</h2>
         <div id="drop" tabindex="0">
           <p><strong>Drop a G-code file here</strong> or <label class="link">pick one<input type="file" id="fileInput" accept=".nc,.gcode,.ngc,.tap,.txt,.cnc,.g"></label></p>
           <p class="small">From Onshape CAM Studio, Fusion 360, Kiri:Moto, SolidWorks CAM (mach_iii post) and most other CAM programs.</p>
         </div>
         <div id="onshapePick" hidden>
           <p class="small">Or open an NC file you imported into this Onshape document.</p>
-          <div class="row">
+          <div class="row pick">
             <button id="onshapeSignIn">Sign in to Onshape</button>
             <select id="onshapeFiles" hidden></select>
             <button id="onshapeLoad" hidden>Open</button>
@@ -131,7 +131,7 @@
     </section>
 
     <section id="previewPanel">
-      <h2><span class="step">4.</span> Check the toolpath</h2>
+      <h2><span class="step">4</span>Check the toolpath</h2>
       <div class="views">
         <figure><canvas id="top" width="460" height="340"></canvas><figcaption>From above (X and Y)</figcaption></figure>
         <figure><canvas id="side" width="460" height="160"></canvas><figcaption>From the front (X and Z)</figcaption></figure>
@@ -142,33 +142,39 @@
     </section>
 
     <section id="sendPanel">
-      <h2><span class="step">5.</span> Download or send it</h2>
-      <div class="row">
-        <button id="download" disabled>Download GRBL file</button>
-        <button id="downloadParts" hidden>Download one file per tool</button>
-        <button id="saveOnshape" hidden>Save to this Onshape document</button>
+      <h2><span class="step">5</span>Download or send it</h2>
+      <div class="send">
+        <div class="files">
+          <div class="row">
+            <button id="download" disabled>Download GRBL file</button>
+            <button id="downloadParts" hidden>Download one file per tool</button>
+            <button id="saveOnshape" hidden>Save to this Onshape document</button>
+          </div>
+          <p id="saveNote" class="small"></p>
+        </div>
+        <div class="machine">
+          <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
+          <div id="inFrame" class="row" hidden>
+            <span>Sending over USB needs GRBL Prep in its own browser tab.</span>
+            <button id="openTab">Open in its own tab to send</button>
+          </div>
+          <div class="row">
+            <button id="connect">Connect to GRBL</button>
+            <span id="state" class="state">Not connected</span>
+            <span id="where"></span>
+          </div>
+          <progress id="progress" value="0" max="1"></progress>
+          <p id="progressText" class="small"></p>
+          <div class="row controls">
+            <button id="home" disabled>Home ($H)</button>
+            <button id="start" disabled>Start job</button>
+            <button id="pause" disabled>Pause</button>
+            <button id="resume" disabled>Resume</button>
+            <button id="stop" class="stop" disabled>STOP</button>
+          </div>
+          <div id="machineMessages"></div>
+        </div>
       </div>
-      <p id="saveNote" class="small"></p>
-      <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
-      <div id="inFrame" class="row" hidden>
-        <span>Sending over USB needs GRBL Prep in its own browser tab.</span>
-        <button id="openTab">Open in its own tab to send</button>
-      </div>
-      <div class="row">
-        <button id="connect">Connect to GRBL</button>
-        <span id="state" class="state">Not connected</span>
-        <span id="where" class="small"></span>
-      </div>
-      <progress id="progress" value="0" max="1"></progress>
-      <p id="progressText" class="small"></p>
-      <div class="row controls">
-        <button id="home" disabled>Home ($H)</button>
-        <button id="start" disabled>Start job</button>
-        <button id="pause" disabled>Pause</button>
-        <button id="resume" disabled>Resume</button>
-        <button id="stop" class="stop" disabled>STOP</button>
-      </div>
-      <div id="machineMessages"></div>
     </section>
   </main>
 
