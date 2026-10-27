@@ -7,13 +7,15 @@
 <body>
   <p id="note">Signing in to Onshape...</p>
   <script>
-    // The Worker sends the sign-in popup here with the tokens in the URL fragment.
-    // Hand them to the GRBL Prep page that opened this popup, then close.
+    // The Worker sends the sign-in here with the tokens in the URL fragment. Hand them to the
+    // GRBL Prep page that asked: the page that opened this popup, or the page this hidden frame
+    // sits in. Only a page on this same site can receive them.
     const fields = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
     history.replaceState(null, '', location.pathname);
-    if (window.opener) {
-      window.opener.postMessage({ grblPrepSignIn: fields }, location.origin);
-      window.close();
+    const page = window.opener || (window.parent !== window ? window.parent : null);
+    if (page) {
+      page.postMessage({ grblPrepSignIn: fields }, location.origin);
+      if (window.opener) window.close();
     } else {
       document.getElementById('note').textContent = fields.error
         ? `Sign-in didn't work: ${fields.error}`

@@ -30,19 +30,25 @@ export function keepOnshapeAwake(ctx) {
   setInterval(send, 5 * 60 * 1000);
 }
 
+// Tokens live in localStorage, so a sign-in lasts past closing the tab. The refresh token keeps
+// it going after the hour-long access token runs out.
+const STORE = 'grblprep.onshape';
+
 function tokens() {
-  try { return JSON.parse(sessionStorage.getItem('grblprep.onshape')) || null; } catch { return null; }
+  try { return JSON.parse(localStorage.getItem(STORE)) || null; } catch { return null; }
 }
 
 function keep(t) {
-  try { sessionStorage.setItem('grblprep.onshape', JSON.stringify(t)); } catch {}
+  try { localStorage.setItem(STORE, JSON.stringify({ access_token: t.access_token, refresh_token: t.refresh_token })); } catch {}
+}
+
+function forget() {
+  try { localStorage.removeItem(STORE); } catch {}
 }
 
 export const signedIn = () => !!tokens()?.access_token;
 
-// Onshape's sign-in page can't load inside an iframe, so it goes in a popup.
-export function signIn() {
-  const state = crypto.randomUUID();
+function authorizeUrl(state) {
   const url = new URL('https://oauth.onshape.com/oauth/authorize');
   url.search = new URLSearchParams({
     response_type: 'code',
@@ -50,35 +56,72 @@ export function signIn() {
     redirect_uri: SETUP.worker + '/oauth/callback',
     state,
   });
-  const popup = window.open(url, 'onshapeSignIn', 'width=520,height=700');
-  if (!popup) return Promise.reject(new Error('The sign-in popup was blocked. Allow popups for this page and try again.'));
+  return url;
+}
 
+// signed_in.html posts the tokens back here, from the popup or from the hidden frame.
+function waitForTokens(state, ms) {
   return new Promise((resolve, reject) => {
+    const timer = ms && setTimeout(() => { window.removeEventListener('message', heard); reject(new Error('timed out')); }, ms);
     function heard(e) {
-      if (e.origin !== location.origin || !e.data?.grblPrepSignIn) return;
+      if (e.origin !== location.origin || e.data?.grblPrepSignIn?.state !== state) return;
       window.removeEventListener('message', heard);
+      clearTimeout(timer);
       const f = e.data.grblPrepSignIn;
-      if (f.error) return reject(new Error(`Onshape sign-in didn't work: ${f.error}`));
-      if (f.state !== state) return reject(new Error('Sign-in reply didn\'t match. Try again.'));
-      keep({ access_token: f.access_token, refresh_token: f.refresh_token });
+      if (f.error || !f.access_token) return reject(new Error(`Onshape sign-in didn't work: ${f.error || 'no token'}`));
+      keep(f);
       resolve();
     }
     window.addEventListener('message', heard);
   });
 }
 
-async function refresh() {
-  const reply = await fetch(SETUP.worker + '/oauth/refresh', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: tokens()?.refresh_token }),
-  });
-  const t = await reply.json();
-  if (!t.access_token) {
-    sessionStorage.removeItem('grblprep.onshape');
-    throw new Error('Your Onshape sign-in ran out. Sign in again.');
+// Once someone has allowed GRBL Prep, Onshape's authorize page sends them straight back with a
+// code and shows nothing. So try that in a hidden frame first: the page never leaves, and if
+// Onshape wants to show a page instead (the first time, or when signed out), it just times out.
+export async function signInQuietly() {
+  const state = crypto.randomUUID();
+  const frame = document.createElement('iframe');
+  frame.hidden = true;
+  frame.src = authorizeUrl(state);
+  document.body.append(frame);
+  try {
+    await waitForTokens(state, 10000);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    frame.remove();
   }
-  keep(t);
+}
+
+// The first time, Onshape asks the user to allow the app. That page can't load inside a frame,
+// so it goes in a popup.
+export function signIn() {
+  const state = crypto.randomUUID();
+  const popup = window.open(authorizeUrl(state), 'onshapeSignIn', 'width=520,height=700');
+  if (!popup) return Promise.reject(new Error('The sign-in popup was blocked. Allow popups for this page and try again.'));
+  return waitForTokens(state);
+}
+
+// Swaps the refresh token for new ones, or failing that tries the quiet sign-in again.
+async function refresh() {
+  const saved = tokens()?.refresh_token;
+  if (saved) {
+    const reply = await fetch(SETUP.worker + '/oauth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: saved }),
+    });
+    const t = await reply.json().catch(() => ({}));
+    if (t.access_token) return keep(t);
+  }
+  forget();
+  if (!(await signInQuietly())) throw new SignInNeeded();
+}
+
+export class SignInNeeded extends Error {
+  constructor() { super('Sign in to Onshape to see the parts in this document.'); }
 }
 
 // Onshape access tokens last an hour, so a 401 means get a fresh one and try once more.

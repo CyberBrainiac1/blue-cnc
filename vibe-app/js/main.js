@@ -302,7 +302,8 @@ async function showOnshapeFiles() {
     $('onshapeFiles').hidden = $('onshapeLoad').hidden = !files.length;
     $('onshapeNote').textContent = files.length ? '' : 'No NC files here yet. Post from CAM Studio, then import the file into this document.';
   } catch (err) {
-    $('onshapeNote').textContent = err.message;
+    if (err instanceof onshape.SignInNeeded) askToSignIn();
+    else $('onshapeNote').textContent = err.message;
   }
 }
 
@@ -313,11 +314,24 @@ async function showPartStudios() {
     $('partSignIn').hidden = true;
     $('partStudio').replaceChildren(...studios.map(t => new Option(t.name, t.id)));
     $('partStudio').hidden = !studios.length;
+    // start on the Part Studio picked last time in this document
+    const last = remember('studio');
+    if (studios.some(t => t.id === last)) $('partStudio').value = last;
     if (studios.length) await showParts();
     else $('partNote').textContent = 'There are no Part Studios in this document.';
   } catch (err) {
-    $('partNote').textContent = err.message;
+    if (err instanceof onshape.SignInNeeded) askToSignIn();
+    else $('partNote').textContent = err.message;
   }
+}
+
+// small per-document memory, so the same studio and part come up next time
+function remember(what, value) {
+  const key = `grblprep.${what}.${onshapeCtx.documentId}`;
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    localStorage.setItem(key, value);
+  } catch {}
 }
 
 async function showParts() {
@@ -326,16 +340,24 @@ async function showParts() {
     const parts = await onshape.listParts(onshapeCtx, $('partStudio').value);
     $('partList').replaceChildren(...parts.map(p => new Option(p.name, p.id)));
     $('partList').hidden = $('partUse').hidden = !parts.length;
+    const last = remember('part');
+    if (parts.some(p => p.id === last)) $('partList').value = last;
     $('partNote').textContent = parts.length ? '' : 'That Part Studio has no parts.';
   } catch (err) {
-    $('partNote').textContent = err.message;
+    if (err instanceof onshape.SignInNeeded) askToSignIn();
+    else $('partNote').textContent = err.message;
   }
 }
 
-$('partStudio').addEventListener('change', showParts);
+$('partStudio').addEventListener('change', () => {
+  remember('studio', $('partStudio').value);
+  showParts();
+});
+$('partList').addEventListener('change', () => remember('part', $('partList').value));
 
 $('partUse').addEventListener('click', async () => {
   const option = $('partList').selectedOptions[0];
+  remember('part', option.value);
   $('partNote').textContent = `Reading ${option.text}...`;
   try {
     usePart(option.text, await onshape.readPart(onshapeCtx, $('partStudio').value, option.value));
@@ -352,12 +374,26 @@ if (onshapeCtx) {
     $('onshapeSignIn').disabled = $('partSignIn').disabled = true;
     $('onshapeNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so drop the file in instead.';
     $('partNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so only the sample plates work.';
-  } else if (onshape.signedIn()) {
-    showOnshapeFiles();
-    showPartStudios();
+  } else {
+    connectOnshape();
   }
 } else {
   $('partNote').textContent = 'Open GRBL Prep from an Onshape document to pick your own parts.';
+}
+
+// Connects without a click when it can: with the saved sign-in, or quietly through Onshape
+// for anyone who has already allowed GRBL Prep. The button only shows up when that fails.
+async function connectOnshape() {
+  $('partSignIn').hidden = $('onshapeSignIn').hidden = true;
+  $('partNote').textContent = $('onshapeNote').textContent = 'Connecting to Onshape...';
+  if (!onshape.signedIn() && !(await onshape.signInQuietly())) return askToSignIn();
+  showOnshapeFiles();
+  showPartStudios();
+}
+
+function askToSignIn() {
+  $('partSignIn').hidden = $('onshapeSignIn').hidden = false;
+  $('partNote').textContent = $('onshapeNote').textContent = 'Click Sign in to Onshape once to let GRBL Prep read this document. After that it connects by itself.';
 }
 
 async function signInAndList() {
