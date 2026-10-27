@@ -66,7 +66,8 @@ async function askForTokens(env, fields) {
   const reply = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ...fields, client_id: env.CLIENT_ID, client_secret: env.CLIENT_SECRET }),
+    // trim: a secret pasted into the dashboard or a terminal can pick up a space or newline
+    body: new URLSearchParams({ ...fields, client_id: env.CLIENT_ID.trim(), client_secret: env.CLIENT_SECRET.trim() }),
   });
   return { status: reply.status, body: await reply.json().catch(() => ({ error: 'bad reply from Onshape' })) };
 }
