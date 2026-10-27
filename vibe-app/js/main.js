@@ -1,7 +1,7 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
 import { toolpath } from './toolpath.js';
 import { drawPath } from './preview.js';
-import * as onshape from './onshape.js';
+import * as onshape from './onshape.js?v=2';
 import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
