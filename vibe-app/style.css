@@ -90,8 +90,8 @@ button.stop {
 .msg.bad { background: #fdecea; border: 1px solid #e57373; }
 .msg.info { background: #eef3f8; border: 1px solid #b8c7d8; }
 
-#changes { padding-left: 20px; margin: 6px 0; }
-#changes li { margin: 2px 0; }
+#changes, #camDone, #camSkipped { padding-left: 20px; margin: 6px 0; }
+#changes li, #camDone li, #camSkipped li { margin: 2px 0; }
 
 .state { font-weight: 600; }
 
@@ -114,3 +114,25 @@ dialog label { display: block; margin: 8px 0; }
 @media (max-width: 800px) {
   main { grid-template-columns: 1fr; }
 }
+
+.tabs { display: flex; gap: 4px; margin: -4px 0 12px; border-bottom: 1px solid #dde1e6; }
+.tabs button {
+  background: transparent;
+  color: #2a5d94;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: -1px;
+}
+.tabs button[aria-selected="true"] { background: #fff; color: #1d2329; border-color: #dde1e6; font-weight: 600; }
+
+#camPanel h2, #gcodePanel h2 { margin-top: 14px; }
+#camPanel h2:first-child, #gcodePanel h2:first-child { margin-top: 0; }
+
+select { font: inherit; padding: 5px 6px; border: 1px solid #b8c1cb; border-radius: 6px; background: #fff; }
+.picked { font-weight: 600; margin: 6px 0; }
+
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin-top: 8px; }
+.settings label { display: flex; flex-direction: column; font-size: 13px; color: #5a6470; gap: 2px; }
+.settings input, .settings select { font-size: 15px; }
+.settings button { grid-column: 1 / -1; justify-self: start; }

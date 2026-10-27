@@ -116,3 +116,27 @@ export async function saveToDocument(ctx, name, lines) {
   form.append('encodedFilename', name);
   await api(`/api/v6/blobelements/d/${ctx.documentId}/w/${ctx.workspaceId}`, { method: 'POST', body: form });
 }
+
+// ---------- parts, for cutting a flat part ----------
+
+export async function listPartStudios(ctx) {
+  const reply = await api(`/api/v6/documents/d/${ctx.documentId}/w/${ctx.workspaceId}/elements?elementType=PARTSTUDIO`);
+  return (await reply.json()).map(t => ({ id: t.id, name: t.name }));
+}
+
+export async function listParts(ctx, elementId) {
+  const reply = await api(`/api/v6/parts/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}`);
+  return (await reply.json())
+    .filter(p => !p.bodyType || p.bodyType === 'solid')
+    .map(p => ({ id: p.partId, name: p.name }));
+}
+
+// The faces of a part and the points along its edges, which is all the CAM needs.
+export async function readPart(ctx, elementId, partId) {
+  const base = `/api/v6/parts/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/partid/${encodeURIComponent(partId)}`;
+  const [body, edges] = await Promise.all([
+    api(`${base}/bodydetails?includeGeometricData=true`).then(r => r.json()),
+    api(`${base}/tessellatededges?chordTolerance=0.00005&angleTolerance=0.1`).then(r => r.json()),
+  ]);
+  return { body, edges };
+}

@@ -45,15 +45,28 @@ test('refresh hands back new tokens with CORS for the app only', async () => {
   assert.equal(calls[0].body.grant_type, 'refresh_token');
 });
 
-test('only the three Onshape calls the page needs get through', async () => {
+test('only the Onshape calls the page needs get through', async () => {
   const list = await ask('/api/v6/documents/d/abc/w/def/elements?elementType=BLOB', { headers: { Authorization: 'Bearer acc' } });
   assert.equal(list.status, 200);
   assert.equal(calls[0].url, 'https://cad.onshape.com/api/v6/documents/d/abc/w/def/elements?elementType=BLOB');
   assert.equal(calls[0].headers.Authorization, 'Bearer acc');
 
-  for (const path of ['/api/v6/parts/d/abc/w/def', '/api/v6/documents/d/abc', '/api/v6/users/sessioninfo']) {
+  for (const path of [
+    '/api/v6/parts/d/abc/w/def/e/ghi',
+    '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/bodydetails',
+    '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/tessellatededges',
+  ]) {
+    assert.equal((await ask(path)).status, 200, path);
+  }
+  for (const path of [
+    '/api/v6/parts/d/abc/w/def',
+    '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/massproperties',
+    '/api/v6/documents/d/abc',
+    '/api/v6/users/sessioninfo',
+  ]) {
     assert.equal((await ask(path)).status, 404, path);
   }
   assert.equal((await ask('/api/v6/blobelements/d/a/w/b/e/c', { method: 'DELETE' })).status, 404);
-  assert.equal(calls.length, 1);
+  assert.equal((await ask('/api/v6/parts/d/abc/w/def/e/ghi', { method: 'POST' })).status, 404);
+  assert.equal(calls.length, 4);
 });

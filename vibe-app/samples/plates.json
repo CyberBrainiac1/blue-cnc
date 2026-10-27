@@ -1,0 +1,14 @@
+[
+ {
+  "name": "Gusset, 1/4 in aluminium",
+  "file": "gusset.json"
+ },
+ {
+  "name": "Bellypan, 1/8 in polycarbonate",
+  "file": "bellypan.json"
+ },
+ {
+  "name": "Bearing plate, 1/2 in aluminium",
+  "file": "bearing_plate.json"
+ }
+]

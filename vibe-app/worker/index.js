@@ -11,11 +11,15 @@
 const ONSHAPE = 'https://cad.onshape.com';
 const TOKEN_URL = 'https://oauth.onshape.com/oauth/token';
 
-// The only Onshape API calls the page makes: list a document's tabs, read a file tab, add a file tab.
+// The only Onshape API calls the page makes: list a document's tabs, read a file tab, add a file
+// tab, list the parts in a Part Studio, and read one part's faces and edges. All read-only except
+// adding a file tab.
 const ALLOWED = [
   ['GET', /^\/api\/v6\/documents\/d\/\w+\/w\/\w+\/elements$/],
   ['GET', /^\/api\/v6\/blobelements\/d\/\w+\/w\/\w+\/e\/\w+$/],
   ['POST', /^\/api\/v6\/blobelements\/d\/\w+\/w\/\w+$/],
+  ['GET', /^\/api\/v6\/parts\/d\/\w+\/w\/\w+\/e\/\w+$/],
+  ['GET', /^\/api\/v6\/parts\/d\/\w+\/w\/\w+\/e\/\w+\/partid\/[\w%.-]+\/(bodydetails|tessellatededges)$/],
 ];
 
 export default {

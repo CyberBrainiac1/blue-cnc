@@ -9,38 +9,101 @@
 <body>
   <header>
     <h1>GRBL Prep</h1>
-    <span class="tagline">Get CAM G-code ready for a GRBL router, then send it.</span>
+    <span class="tagline">Turn a flat part into G-code for a GRBL router, then send it.</span>
     <button id="helpButton" class="quiet">Help</button>
   </header>
 
   <main>
     <section id="filePanel">
-      <h2>1. Your G-code</h2>
-      <div id="drop" tabindex="0">
-        <p><strong>Drop a G-code file here</strong> or <label class="link">pick one<input type="file" id="fileInput" accept=".nc,.gcode,.ngc,.tap,.txt,.cnc,.g"></label></p>
-        <p class="small">From Onshape CAM Studio, Fusion 360, Kiri:Moto, SolidWorks CAM (mach_iii post) and most other CAM programs.</p>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabCam" aria-selected="true" aria-controls="camPanel">Cut a flat part</button>
+        <button role="tab" id="tabGcode" aria-selected="false" aria-controls="gcodePanel">I already have G-code</button>
       </div>
-      <div id="onshapePick" hidden>
-        <p class="small">Or open an NC file you imported into this Onshape document.</p>
-        <div class="row">
-          <button id="onshapeSignIn">Sign in to Onshape</button>
-          <select id="onshapeFiles" hidden></select>
-          <button id="onshapeLoad" hidden>Open</button>
+
+      <div id="camPanel" role="tabpanel">
+        <h2>1. Pick the part</h2>
+        <div id="partOnshape" hidden>
+          <div class="row">
+            <button id="partSignIn">Sign in to Onshape</button>
+            <select id="partStudio" hidden></select>
+            <select id="partList" hidden></select>
+            <button id="partUse" hidden>Use this part</button>
+          </div>
         </div>
-        <p id="onshapeNote" class="small"></p>
-      </div>
-      <div id="result" hidden>
-        <p id="fileName"></p>
-        <div id="refused" class="refused" hidden></div>
-        <div id="warnings" class="warnings" hidden></div>
-        <details id="changesBox" open>
-          <summary id="changesTitle">What changed</summary>
-          <ul id="changes"></ul>
-        </details>
         <div class="row">
-          <button id="download">Download GRBL file</button>
-          <button id="downloadParts" hidden>Download one file per tool</button>
-          <button id="saveOnshape" hidden>Save to this Onshape document</button>
+          <span class="small" id="sampleLabel">Or try a sample plate:</span>
+          <select id="sampleList"></select>
+          <button id="sampleUse" class="quiet">Use this plate</button>
+        </div>
+        <p id="partNote" class="small"></p>
+        <p id="partName" class="picked" hidden></p>
+
+        <h2>2. Material and bit</h2>
+        <div class="row">
+          <label>Material <select id="material"></select></label>
+          <label>Bit <select id="bit"></select></label>
+        </div>
+        <details id="moreSettings">
+          <summary>More settings</summary>
+          <form id="camSettings" class="settings">
+            <label>Feed (mm/min) <input name="feed" type="number" step="any"></label>
+            <label>Ramp feed (mm/min) <input name="rampFeed" type="number" step="any"></label>
+            <label>Spindle (RPM) <input name="rpm" type="number" step="any"></label>
+            <label>Depth per pass (mm) <input name="doc" type="number" step="any"></label>
+            <label>Stepover (% of the bit) <input name="stepover" type="number" step="any"></label>
+            <label>Ramp angle (degrees) <input name="rampAngle" type="number" step="any"></label>
+            <label>Cut direction
+              <select name="climb"><option value="true">Climb</option><option value="false">Conventional</option></select>
+            </label>
+            <label>Cut past the bottom (mm) <input name="overcut" type="number" step="any"></label>
+            <label>Tab height (mm) <input name="tabHeight" type="number" step="any"></label>
+            <label>Tab length (mm) <input name="tabLength" type="number" step="any"></label>
+            <button type="button" id="settingsReset" class="quiet">Back to the suggested numbers</button>
+          </form>
+        </details>
+
+        <h2>3. Make the toolpath</h2>
+        <div class="row">
+          <button id="generate" disabled>Make toolpath</button>
+          <span id="generateNote" class="small"></span>
+        </div>
+        <div id="camResult" hidden>
+          <div id="camRefused" class="refused" hidden></div>
+          <div id="camWarnings" class="warnings" hidden></div>
+          <details id="camDoneBox" open>
+            <summary id="camDoneTitle">What gets cut</summary>
+            <ul id="camDone"></ul>
+          </details>
+          <details id="camSkippedBox" open hidden>
+            <summary id="camSkippedTitle">What's left for you</summary>
+            <ul id="camSkipped"></ul>
+          </details>
+        </div>
+      </div>
+
+      <div id="gcodePanel" role="tabpanel" hidden>
+        <h2>1. Your G-code</h2>
+        <div id="drop" tabindex="0">
+          <p><strong>Drop a G-code file here</strong> or <label class="link">pick one<input type="file" id="fileInput" accept=".nc,.gcode,.ngc,.tap,.txt,.cnc,.g"></label></p>
+          <p class="small">From Onshape CAM Studio, Fusion 360, Kiri:Moto, SolidWorks CAM (mach_iii post) and most other CAM programs.</p>
+        </div>
+        <div id="onshapePick" hidden>
+          <p class="small">Or open an NC file you imported into this Onshape document.</p>
+          <div class="row">
+            <button id="onshapeSignIn">Sign in to Onshape</button>
+            <select id="onshapeFiles" hidden></select>
+            <button id="onshapeLoad" hidden>Open</button>
+          </div>
+          <p id="onshapeNote" class="small"></p>
+        </div>
+        <div id="result" hidden>
+          <p id="fileName"></p>
+          <div id="refused" class="refused" hidden></div>
+          <div id="warnings" class="warnings" hidden></div>
+          <details id="changesBox" open>
+            <summary id="changesTitle">What changed</summary>
+            <ul id="changes"></ul>
+          </details>
         </div>
       </div>
 
@@ -68,17 +131,24 @@
     </section>
 
     <section id="previewPanel">
-      <h2>2. Check the toolpath</h2>
+      <h2><span class="step">4.</span> Check the toolpath</h2>
       <div class="views">
         <figure><canvas id="top" width="460" height="340"></canvas><figcaption>From above (X and Y)</figcaption></figure>
         <figure><canvas id="side" width="460" height="160"></canvas><figcaption>From the front (X and Z)</figcaption></figure>
       </div>
       <p class="small">Solid lines cut, dashed lines are rapid moves. The red cross is X0 Y0, the point you zero on.</p>
+      <p id="cutTime" class="picked" hidden></p>
       <p id="size" class="small"></p>
     </section>
 
     <section id="sendPanel">
-      <h2>3. Send it to the machine</h2>
+      <h2><span class="step">5.</span> Download or send it</h2>
+      <div class="row">
+        <button id="download" disabled>Download GRBL file</button>
+        <button id="downloadParts" hidden>Download one file per tool</button>
+        <button id="saveOnshape" hidden>Save to this Onshape document</button>
+      </div>
+      <p id="saveNote" class="small"></p>
       <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
       <div id="inFrame" class="row" hidden>
         <span>Sending over USB needs GRBL Prep in its own browser tab.</span>
@@ -119,8 +189,16 @@
   <dialog id="help">
     <form method="dialog">
       <h2>How to use GRBL Prep</h2>
-      <h3>Converting</h3>
-      <p>Post your toolpath from CAM as plain G-code and drop the file in. The page changes the parts GRBL can't run, lists every change, and draws the path so you can check it before anything moves. Nothing leaves your computer.</p>
+      <h3>Cutting a flat part</h3>
+      <p>Pick a part from a Part Studio in this document, pick the material and the end mill, and click Make toolpath. GRBL Prep works out the plate's thickness, the outline, the holes and any pockets from the model, and makes the G-code itself. You don't need CAM Studio.</p>
+      <p>It cuts in this order: pockets, then holes and cutouts, then the outline. Every cut ramps or spirals down into the material, so the bit never plunges straight in. The outline leaves small tabs holding the part to the stock. Break or saw through them after the job and file the spots smooth.</p>
+      <p>Zero X0 Y0 on the front left corner of the stock and Z0 on its top. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline.</p>
+      <h3>What it can't do</h3>
+      <p>It only cuts from the top. Pockets on the other side, holes going into the edge, chamfers and rounded edges get listed and left for you. Holes smaller than the bit are listed too, so drill those by hand. Parts with curved or sloped surfaces need a 3D toolpath, so use Kiri:Moto (free in the Onshape App Store) for those.</p>
+      <h3>More settings</h3>
+      <p>The suggested numbers are gentle on purpose, for a light router with a 1200 mm/min top speed. If a cut sounds rough, lower the depth per pass first. Feeds and spindle speeds above the machine's limits get pulled back down.</p>
+      <h3>Already have G-code?</h3>
+      <p>Use the "I already have G-code" tab. Post your toolpath from CAM as plain G-code and drop the file in. The page changes the parts GRBL can't run, lists every change, and draws the path so you can check it before anything moves. Nothing leaves your computer.</p>
       <p>It takes out program numbers, line numbers, tool length offsets and codes GRBL doesn't have. It turns drilling cycles into plain moves, swaps G28 for a lift and a move back to X0 Y0, and fixes dwells written in milliseconds. If a file uses cutter compensation, feed per rev, macros or a fourth axis, it stops and tells you what to change in your CAM.</p>
       <p>Check the warnings. The most important one is when the job is bigger than the machine's travel.</p>
       <h3>Tool changes</h3>
@@ -131,7 +209,7 @@
       <p>Plug the GRBL board into the laptop with USB and click Connect. This works in Chrome and Edge. The board resets when it connects, so connect before you turn on the spindle's VFD. Home the machine, zero it on the CAM origin in gSender (close gSender before you connect here), then click Start job.</p>
       <p>Pause holds the motion and Resume carries on. STOP holds the motion and then resets GRBL, so everything stops and the machine needs homing again. If GRBL reports an error, the job pauses and the page says which line and why.</p>
       <h3>Inside Onshape</h3>
-      <p>In CAM Studio, post your toolpath and save the NC file, then import it into the same document (the + menu, then Import). In GRBL Prep, click Sign in to Onshape once, pick the file from the list and click Open. "Save to this Onshape document" adds the GRBL version as a new tab, so it's versioned with the part. The page only reads and adds file tabs. It never changes your parts.</p>
+      <p>Click Sign in to Onshape once. GRBL Prep then lists the Part Studios and parts in this document. On the G-code tab it also lists NC files you imported (post from CAM Studio, save the NC file, then use the + menu and Import). "Save to this Onshape document" adds the GRBL file as a new tab, so it's versioned with the part. The page only reads parts and adds file tabs. It never changes your parts.</p>
       <h3>Machine settings</h3>
       <p>They start out as the team's blue desktop CNC. Change them to match your router. They're saved in this browser.</p>
       <div class="row"><button value="close">Close</button></div>

@@ -5,11 +5,12 @@ import { GrblSender, STATES } from './grbl.js';
 import { serialWorks, openSerial } from './serial.js';
 import { MockGrbl } from './mockgrbl.js';
 import * as onshape from './onshape.js';
+import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
 const useMock = new URLSearchParams(location.search).has('mock');
 
-let job = null;       // { name, lines, path }
+let job = null;       // { name, source, lines, path, parts, kind }
 let link = null;      // the open serial port (or the mock)
 let sender = null;
 let machineState = null;
@@ -44,17 +45,36 @@ function readMachineForm() {
   try { localStorage.setItem('grblprep.machine', JSON.stringify(machine)); } catch {}
 }
 
+function machineChanged() {
+  if (job?.kind === 'cam') $('generateNote').textContent = 'The machine settings changed. Click Make toolpath again.';
+  else if (job) loadText(job.name, job.source);
+}
+
 $('machine').addEventListener('change', () => {
   readMachineForm();
-  if (job) loadText(job.name, job.source);
+  machineChanged();
 });
 
 $('machineReset').addEventListener('click', () => {
   machine = structuredClone(TEAM_MACHINE);
   fillMachineForm();
   readMachineForm();
-  if (job) loadText(job.name, job.source);
+  machineChanged();
 });
+
+// ---------- the two tabs ----------
+
+function showTab(cam) {
+  $('tabCam').setAttribute('aria-selected', String(cam));
+  $('tabGcode').setAttribute('aria-selected', String(!cam));
+  $('camPanel').hidden = !cam;
+  $('gcodePanel').hidden = cam;
+  // the G-code tab has one step before the preview, cutting a part has three
+  document.querySelectorAll('.step').forEach((el, i) => { el.textContent = `${(cam ? 4 : 2) + i}.`; });
+}
+
+$('tabCam').addEventListener('click', () => showTab(true));
+$('tabGcode').addEventListener('click', () => showTab(false));
 
 // ---------- converting ----------
 
@@ -80,15 +100,11 @@ export function loadText(name, source) {
     $('refused').hidden = false;
     $('refused').textContent = `This file can't be converted. Line ${err.lineNo} (${err.text.trim()}): ${err.reason}`;
     $('changesBox').hidden = true;
-    $('download').disabled = true;
-    $('downloadParts').hidden = true;
-    drawAll(null);
-    updateButtons();
+    clearJob();
     return;
   }
 
-  const path = toolpath(result.lines);
-  job = { name, source, lines: result.lines, path, parts: splitByTool(result.lines) };
+  setJob(name, result.lines, 'gcode', source);
 
   $('changesBox').hidden = false;
   $('changesTitle').textContent = result.changes.length ? `What changed (${result.changes.length})` : 'Nothing needed changing';
@@ -99,11 +115,27 @@ export function loadText(name, source) {
     result.warnings.forEach(w => ul.append(listItem(w)));
     $('warnings').replaceChildren('Check these before you run it:', ul);
   }
+}
+
+function setJob(name, lines, kind, source = lines.join('\n')) {
+  const path = toolpath(lines);
+  job = { name, source, lines, path, parts: splitByTool(lines), kind };
   $('download').disabled = false;
   $('saveOnshape').hidden = !(onshapeCtx && onshape.signedIn());
   $('downloadParts').hidden = job.parts.length < 2;
   $('downloadParts').textContent = `Download one file per tool (${job.parts.length} files)`;
+  $('cutTime').hidden = true;
   drawAll(path);
+  updateButtons();
+}
+
+function clearJob() {
+  job = null;
+  $('download').disabled = true;
+  $('downloadParts').hidden = true;
+  $('saveOnshape').hidden = true;
+  $('cutTime').hidden = true;
+  drawAll(null);
   updateButtons();
 }
 
@@ -119,7 +151,7 @@ function drawAll(path, done = 0) {
 }
 
 function baseName(name) {
-  return name.replace(/\.[^.]+$/, '');
+  return name.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
 function save(name, lines) {
@@ -147,6 +179,120 @@ $('drop').addEventListener('drop', e => {
   e.preventDefault();
   $('drop').classList.remove('over');
   if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+
+// ---------- cutting a flat part ----------
+
+let part = null; // { name, part } for a sample, { name, body, edges } straight from Onshape
+const camWorker = new Worker(new URL('./camworker.js', import.meta.url), { type: 'module' });
+
+for (const [key, m] of Object.entries(MATERIALS)) $('material').append(new Option(m.name, key));
+for (const [key, b] of Object.entries(BITS)) $('bit').append(new Option(b.name, key));
+
+function fillSettings() {
+  const s = settingsFor($('material').value, $('bit').value);
+  for (const input of $('camSettings').elements) {
+    if (!input.name) continue;
+    if (input.name === 'stepover') input.value = Math.round(s.stepover * 100);
+    else input.value = String(s[input.name]);
+  }
+}
+
+function readSettings() {
+  const s = settingsFor($('material').value, $('bit').value);
+  for (const input of $('camSettings').elements) {
+    if (!input.name) continue;
+    if (input.name === 'climb') s.climb = input.value === 'true';
+    else if (input.name === 'stepover') s.stepover = parseFloat(input.value) / 100;
+    else s[input.name] = parseFloat(input.value);
+  }
+  return s;
+}
+
+function pickMaterial() {
+  fillSettings();
+  try { localStorage.setItem('grblprep.cam', JSON.stringify({ material: $('material').value, bit: $('bit').value })); } catch {}
+}
+
+$('material').addEventListener('change', pickMaterial);
+$('bit').addEventListener('change', pickMaterial);
+$('settingsReset').addEventListener('click', fillSettings);
+
+function usePart(name, data) {
+  part = { name, ...data };
+  $('partName').hidden = false;
+  $('partName').textContent = name;
+  $('partNote').textContent = '';
+  $('generate').disabled = false;
+  $('camResult').hidden = true;
+  $('generateNote').textContent = '';
+}
+
+async function loadSamples() {
+  try {
+    const plates = await (await fetch('samples/plates.json')).json();
+    $('sampleList').replaceChildren(...plates.map(p => new Option(p.name, p.file)));
+  } catch {
+    $('sampleList').hidden = $('sampleUse').hidden = $('sampleLabel').hidden = true;
+  }
+}
+
+$('sampleUse').addEventListener('click', async () => {
+  const option = $('sampleList').selectedOptions[0];
+  if (!option) return;
+  const sample = await (await fetch(`samples/${option.value}`)).json();
+  usePart(sample.name, { part: sample.part });
+});
+
+$('generate').addEventListener('click', () => {
+  if (!part) return;
+  $('generate').disabled = true;
+  $('generateNote').textContent = 'Working it out...';
+  const { name, ...data } = part;
+  camWorker.postMessage({ ...data, settings: readSettings(), machine });
+});
+
+function fillList(list, items) {
+  list.replaceChildren(...items.map(text => {
+    const li = document.createElement('li');
+    li.textContent = text;
+    return li;
+  }));
+}
+
+camWorker.addEventListener('message', ({ data }) => {
+  $('generate').disabled = false;
+  $('generateNote').textContent = '';
+  $('camResult').hidden = false;
+  $('camRefused').hidden = data.ok;
+  $('camDoneBox').hidden = !data.ok;
+  $('camSkippedBox').hidden = true;
+  $('camWarnings').hidden = true;
+  if (!data.ok) {
+    $('camRefused').textContent = data.message;
+    clearJob();
+    return;
+  }
+  const { lines, done, skipped, warnings, minutes, stock, thickness } = data.job;
+  // eleven "5.5 mm hole" lines read better as one line with a count
+  const counts = new Map();
+  for (const d of done) counts.set(d, (counts.get(d) || 0) + 1);
+  fillList($('camDone'), [...counts].map(([d, n]) => (n > 1 ? `${d} (${n})` : d)));
+  $('camDoneTitle').textContent = `What gets cut (${done.length})`;
+  if (skipped.length) {
+    $('camSkippedBox').hidden = false;
+    $('camSkippedTitle').textContent = `What's left for you (${skipped.length})`;
+    fillList($('camSkipped'), skipped.map(k => `${k.what}: ${k.why}`));
+  }
+  if (warnings.length) {
+    $('camWarnings').hidden = false;
+    const ul = document.createElement('ul');
+    fillList(ul, warnings);
+    $('camWarnings').replaceChildren('Check these before you run it:', ul);
+  }
+  setJob(`${part.name}.nc`, lines, 'cam');
+  $('cutTime').hidden = false;
+  $('cutTime').textContent = `About ${Math.max(1, Math.round(minutes))} minutes of cutting. Stock: at least ${fmt(Math.ceil(stock.x))} x ${fmt(Math.ceil(stock.y))} mm, ${fmt(+thickness.toFixed(2))} mm thick.`;
 });
 
 // ---------- talking to GRBL ----------
@@ -293,25 +439,72 @@ async function showOnshapeFiles() {
   }
 }
 
-if (onshapeCtx) {
-  onshape.keepOnshapeAwake(onshapeCtx);
-  $('onshapePick').hidden = false;
-  if (!onshape.isSetUp()) {
-    $('onshapeSignIn').disabled = true;
-    $('onshapeNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so drop the file in instead.';
-  } else if (onshape.signedIn()) {
-    showOnshapeFiles();
+async function showPartStudios() {
+  $('partNote').textContent = 'Looking for Part Studios in this document...';
+  try {
+    const studios = await onshape.listPartStudios(onshapeCtx);
+    $('partSignIn').hidden = true;
+    $('partStudio').replaceChildren(...studios.map(t => new Option(t.name, t.id)));
+    $('partStudio').hidden = !studios.length;
+    if (studios.length) await showParts();
+    else $('partNote').textContent = 'There are no Part Studios in this document.';
+  } catch (err) {
+    $('partNote').textContent = err.message;
   }
 }
 
-$('onshapeSignIn').addEventListener('click', async () => {
+async function showParts() {
+  $('partNote').textContent = 'Looking for parts...';
+  try {
+    const parts = await onshape.listParts(onshapeCtx, $('partStudio').value);
+    $('partList').replaceChildren(...parts.map(p => new Option(p.name, p.id)));
+    $('partList').hidden = $('partUse').hidden = !parts.length;
+    $('partNote').textContent = parts.length ? '' : 'That Part Studio has no parts.';
+  } catch (err) {
+    $('partNote').textContent = err.message;
+  }
+}
+
+$('partStudio').addEventListener('change', showParts);
+
+$('partUse').addEventListener('click', async () => {
+  const option = $('partList').selectedOptions[0];
+  $('partNote').textContent = `Reading ${option.text}...`;
+  try {
+    usePart(option.text, await onshape.readPart(onshapeCtx, $('partStudio').value, option.value));
+  } catch (err) {
+    $('partNote').textContent = err.message;
+  }
+});
+
+if (onshapeCtx) {
+  onshape.keepOnshapeAwake(onshapeCtx);
+  $('onshapePick').hidden = false;
+  $('partOnshape').hidden = false;
+  if (!onshape.isSetUp()) {
+    $('onshapeSignIn').disabled = $('partSignIn').disabled = true;
+    $('onshapeNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so drop the file in instead.';
+    $('partNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so only the sample plates work.';
+  } else if (onshape.signedIn()) {
+    showOnshapeFiles();
+    showPartStudios();
+  }
+} else {
+  $('partNote').textContent = 'Open GRBL Prep from an Onshape document to pick your own parts.';
+}
+
+async function signInAndList() {
   try {
     await onshape.signIn();
     showOnshapeFiles();
+    showPartStudios();
   } catch (err) {
-    $('onshapeNote').textContent = err.message;
+    $('onshapeNote').textContent = $('partNote').textContent = err.message;
   }
-});
+}
+
+$('onshapeSignIn').addEventListener('click', signInAndList);
+$('partSignIn').addEventListener('click', signInAndList);
 
 $('onshapeLoad').addEventListener('click', async () => {
   const option = $('onshapeFiles').selectedOptions[0];
@@ -326,9 +519,9 @@ $('saveOnshape').addEventListener('click', async () => {
   const name = `${baseName(job.name)}_grbl.nc`;
   try {
     await onshape.saveToDocument(onshapeCtx, name, job.lines);
-    $('onshapeNote').textContent = `Saved ${name} as a new tab in this document.`;
+    $('saveNote').textContent = `Saved ${name} as a new tab in this document.`;
   } catch (err) {
-    $('onshapeNote').textContent = err.message;
+    $('saveNote').textContent = err.message;
   }
 });
 
@@ -345,13 +538,26 @@ function pickUpHandoff() {
   try {
     const h = JSON.parse(localStorage.getItem('grblprep.handoff'));
     localStorage.removeItem('grblprep.handoff');
-    if (h) loadText(h.name, h.source);
+    if (h) {
+      showTab(false);
+      loadText(h.name, h.source);
+    }
   } catch {}
 }
 
 // ---------- start up ----------
 
 fillMachineForm();
+try {
+  const last = JSON.parse(localStorage.getItem('grblprep.cam'));
+  if (last && MATERIALS[last.material] && BITS[last.bit]) {
+    $('material').value = last.material;
+    $('bit').value = last.bit;
+  }
+} catch {}
+fillSettings();
+loadSamples();
+showTab(true);
 const canSend = (serialWorks() && !inFrame) || useMock;
 $('noSerial').hidden = canSend || inFrame;
 $('inFrame').hidden = !inFrame || useMock;
