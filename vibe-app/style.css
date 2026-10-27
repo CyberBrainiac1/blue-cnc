@@ -317,3 +317,13 @@ dialog .row { justify-content: flex-end; margin: 20px 0 0; }
 @media (max-width: 480px) {
   .pair, #machine { grid-template-columns: 1fr; }
 }
+
+/* Onshape's right-hand panel: tighter, so the steps fit beside the model */
+body.panel header { height: 40px; padding: 0 12px; }
+body.panel header .tagline { display: none; }
+body.panel main { gap: 10px; padding: 10px; }
+body.panel section { padding: 12px; }
+body.panel .tabs { gap: 12px; margin: -12px -12px 14px; padding: 0 12px; }
+body.panel #camPanel h2, body.panel #gcodePanel h2 { margin-top: 16px; padding-top: 14px; }
+body.panel .settings, body.panel #machine { padding: 10px; }
+body.panel #drop { padding: 18px 10px; }

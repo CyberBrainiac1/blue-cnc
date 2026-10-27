@@ -19,18 +19,33 @@ export function onshapeContext() {
   const documentId = id('documentId');
   const workspaceId = id('workspaceId', 'workspaceOrVersionId');
   if (!documentId || !workspaceId) return null;
-  return { documentId, workspaceId, elementId: id('elementId'), server: q.get('server') || 'https://cad.onshape.com' };
+  return {
+    documentId, workspaceId, elementId: id('elementId'), server: q.get('server') || 'https://cad.onshape.com',
+    // opened in the right-hand panel of a Part Studio rather than as a tab of its own
+    panel: q.get('panel') === '1',
+  };
 }
 
 export const isSetUp = () => !!(SETUP.clientId && SETUP.worker);
 
-// Onshape won't talk to the iframe until it hears a keepAlive, and it ends idle sessions without them.
+// applicationInit tells Onshape the page is ready for messages, which starts the SELECTION
+// messages in the side panel. Onshape ends idle sessions without a keepAlive now and then.
 export function keepOnshapeAwake(ctx) {
-  const send = () => window.parent.postMessage({
-    messageName: 'keepAlive', documentId: ctx.documentId, workspaceId: ctx.workspaceId, elementId: ctx.elementId,
+  const send = messageName => window.parent.postMessage({
+    messageName, documentId: ctx.documentId, workspaceId: ctx.workspaceId, elementId: ctx.elementId,
   }, ctx.server);
-  send();
-  setInterval(send, 5 * 60 * 1000);
+  send('applicationInit');
+  send('keepAlive');
+  setInterval(() => send('keepAlive'), 5 * 60 * 1000);
+}
+
+// Calls back with the ids of whatever is selected in the Part Studio (parts, faces or edges),
+// each time the selection changes.
+export function onSelection(ctx, callback) {
+  window.addEventListener('message', e => {
+    if (e.origin !== ctx.server || e.data?.messageName !== 'SELECTION') return;
+    callback((e.data.selections || []).map(s => s.selectionId).filter(Boolean));
+  });
 }
 
 // Tokens live in localStorage, so a sign-in lasts past closing the tab. The refresh token keeps
@@ -175,6 +190,16 @@ export async function listParts(ctx, elementId) {
   return (await reply.json())
     .filter(p => !p.bodyType || p.bodyType === 'solid')
     .map(p => ({ id: p.partId, name: p.name }));
+}
+
+// The part a selection belongs to. Picking a part in the Parts list gives the part's own id;
+// clicking it in the view gives a face or edge id, so look those up in the Part Studio's bodies.
+export async function partOfSelection(ctx, elementId, ids) {
+  const reply = await api(`/api/v6/partstudios/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/bodydetails`);
+  const bodies = (await reply.json()).bodies || [];
+  return bodies.find(b => ids.includes(b.id))?.id
+    || bodies.find(b => [...(b.faces || []), ...(b.edges || [])].some(f => ids.includes(f.id)))?.id
+    || null;
 }
 
 // The faces of a part and the points along its edges, which is all the CAM needs.

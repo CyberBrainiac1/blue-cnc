@@ -1,7 +1,7 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
 import { toolpath } from './toolpath.js';
 import { drawPath } from './preview.js';
-import * as onshape from './onshape.js?v=2';
+import * as onshape from './onshape.js?v=3';
 import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
@@ -308,6 +308,7 @@ async function showOnshapeFiles() {
 }
 
 async function showPartStudios() {
+  if (onshapeCtx.panel) return showParts();
   $('partNote').textContent = 'Looking for Part Studios in this document...';
   try {
     const studios = await onshape.listPartStudios(onshapeCtx);
@@ -334,18 +335,50 @@ function remember(what, value) {
   } catch {}
 }
 
+// In the side panel the Part Studio is the one it's open next to, so there's no studio to pick.
+const studioId = () => (onshapeCtx.panel ? onshapeCtx.elementId : $('partStudio').value);
+let studioParts = [];
+
 async function showParts() {
   $('partNote').textContent = 'Looking for parts...';
   try {
-    const parts = await onshape.listParts(onshapeCtx, $('partStudio').value);
+    const parts = studioParts = await onshape.listParts(onshapeCtx, studioId());
     $('partList').replaceChildren(...parts.map(p => new Option(p.name, p.id)));
     $('partList').hidden = $('partUse').hidden = !parts.length;
     const last = remember('part');
     if (parts.some(p => p.id === last)) $('partList').value = last;
-    $('partNote').textContent = parts.length ? '' : 'That Part Studio has no parts.';
+    if (!parts.length) $('partNote').textContent = 'That Part Studio has no parts.';
+    else $('partNote').textContent = onshapeCtx.panel ? 'Click a part in the Part Studio, or pick it here.' : '';
   } catch (err) {
     if (err instanceof onshape.SignInNeeded) askToSignIn();
     else $('partNote').textContent = err.message;
+  }
+}
+
+async function readOnshapePart(id, name) {
+  remember('part', id);
+  $('partList').value = id;
+  $('partNote').textContent = `Reading ${name}...`;
+  try {
+    usePart(name, await onshape.readPart(onshapeCtx, studioId(), id));
+  } catch (err) {
+    $('partNote').textContent = err.message;
+  }
+}
+
+// Clicking a part, or any face or edge of it, in the Part Studio picks that part.
+let selected = null;
+async function useSelection(ids) {
+  if (!ids.length || !onshape.signedIn()) return;
+  try {
+    const id = await onshape.partOfSelection(onshapeCtx, studioId(), ids);
+    if (!id || id === selected) return;
+    selected = id;
+    if (!studioParts.some(p => p.id === id)) studioParts = await onshape.listParts(onshapeCtx, studioId());
+    const p = studioParts.find(p => p.id === id);
+    if (p) readOnshapePart(p.id, p.name);
+  } catch (err) {
+    $('partNote').textContent = err.message;
   }
 }
 
@@ -355,21 +388,22 @@ $('partStudio').addEventListener('change', () => {
 });
 $('partList').addEventListener('change', () => remember('part', $('partList').value));
 
-$('partUse').addEventListener('click', async () => {
+$('partUse').addEventListener('click', () => {
   const option = $('partList').selectedOptions[0];
-  remember('part', option.value);
-  $('partNote').textContent = `Reading ${option.text}...`;
-  try {
-    usePart(option.text, await onshape.readPart(onshapeCtx, $('partStudio').value, option.value));
-  } catch (err) {
-    $('partNote').textContent = err.message;
-  }
+  selected = option.value;
+  readOnshapePart(option.value, option.text);
 });
 
 if (onshapeCtx) {
   onshape.keepOnshapeAwake(onshapeCtx);
   $('onshapePick').hidden = false;
   $('partOnshape').hidden = false;
+  if (onshapeCtx.panel) {
+    document.body.classList.add('panel');
+    // the samples are for trying it out, the panel is for your own parts
+    $('sampleList').closest('.row').hidden = true;
+    onshape.onSelection(onshapeCtx, useSelection);
+  }
   if (!onshape.isSetUp()) {
     $('onshapeSignIn').disabled = $('partSignIn').disabled = true;
     $('onshapeNote').textContent = 'This copy of GRBL Prep isn\'t linked to Onshape yet, so drop the file in instead.';
