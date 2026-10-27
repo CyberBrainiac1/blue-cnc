@@ -39,13 +39,13 @@ export function keepOnshapeAwake(ctx) {
   setInterval(() => send('keepAlive'), 5 * 60 * 1000);
 }
 
-// Calls back with everything selected in the Part Studio each time the selection changes, as
-// Onshape sends it: [{ selectionType: 'BODY', selectionId: 'RBCD' }, ...], oldest first. Clicking
-// in the Parts list adds to the selection rather than replacing it.
+// Calls back with everything selected in the Part Studio each time the selection changes, oldest
+// first. Clicks in the Parts list and in the view both add to it. Onshape sends a whole part as
+// { selectionType: 'BODY', selectionId: 'RBCD' } and anything clicked in the view as
+// { selectionType: 'ENTITY', entityType: 'FACE' | 'EDGE' | 'VERTEX', selectionId: 'SmElC' }.
 export function onSelection(ctx, callback) {
   window.addEventListener('message', e => {
     if (e.origin !== ctx.server || e.data?.messageName !== 'SELECTION') return;
-    fetch(SETUP.worker + '/debug-selection?' + new URLSearchParams({ s: JSON.stringify(e.data.selections) })).catch(() => {}); // TEMP
     callback(e.data.selections || []);
   });
 }
@@ -199,14 +199,23 @@ export async function listParts(ctx, elementId) {
     .map(p => ({ id: p.partId, name: p.name }));
 }
 
-// The part a selection belongs to. A whole part (BODY) comes with its part id already; a face or
-// edge clicked in the view needs looking up in the Part Studio's bodies.
+// The part a selection belongs to. A whole part (BODY) comes with its part id already; a face,
+// edge or corner clicked in the view needs looking up in the Part Studio's bodies. That list is
+// big in a big Part Studio, so it's kept until a lookup misses (the model changed), then fetched
+// again once.
+const studioBodies = new Map();
+
 export async function partOfSelection(ctx, elementId, selection) {
   const id = selection.selectionId;
   if (selection.selectionType === 'BODY') return id;
+  const owner = bodies => bodies.find(b => b.id === id
+    || [b.faces, b.edges, b.vertices].some(list => (list || []).some(f => f.id === id)))?.id;
+  const cached = studioBodies.get(elementId);
+  if (cached && owner(cached)) return owner(cached);
   const reply = await api(`/api/v6/partstudios/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/bodydetails`);
   const bodies = (await reply.json()).bodies || [];
-  return bodies.find(b => b.id === id || [...(b.faces || []), ...(b.edges || [])].some(f => f.id === id))?.id || null;
+  studioBodies.set(elementId, bodies);
+  return owner(bodies) || null;
 }
 
 // The faces of a part and the points along its edges, which is all the CAM needs.
