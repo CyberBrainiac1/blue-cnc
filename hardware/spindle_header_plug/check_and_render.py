@@ -1,5 +1,6 @@
 """Clash checks against a simple model of the header, plus preview renders (renders/*.png).
-The header model is built from the same (typical, unmeasured) numbers in header_plug.py."""
+The header model is a plain rectangular socket 0.1 mm bigger than the plug's in-socket part
+(fit test piece 1 fit the real header snugly), with 4 square pins."""
 import os
 import numpy as np
 import matplotlib
@@ -10,12 +11,12 @@ import cadquery as cq
 import header_plug as hp
 
 
-def header():
-    """Housing walls + floor + 4 square pins (no ribs)."""
-    L, W, wl = hp.SOCK_L, hp.SOCK_W, hp.SOCK_WALL
-    yc = -hp.PIN_Y
-    outer = hp.box(-L / 2 - wl, L / 2 + wl, yc - W / 2 - wl, yc + W / 2 + wl, -1.5, hp.SOCK_H)
-    h = outer.cut(hp.box(-L / 2, L / 2, yc - W / 2, yc + W / 2, 0, hp.SOCK_H + 1))
+def header(v=None):
+    """Housing walls + floor + 4 square pins, socket 0.1 mm bigger than size v."""
+    W, L = (d + 0.1 for d in hp.VARIANTS[v or hp.SIZE])
+    wl = hp.SOCK_WALL
+    h = hp.box(-L / 2 - wl, L / 2 + wl, -W / 2 - wl, W / 2 + wl, -1.5, hp.SOCK_H)
+    h = h.cut(hp.box(-L / 2, L / 2, -W / 2, W / 2, 0, hp.SOCK_H + 1))
     for i in range(hp.N):
         t = hp.PIN_T / 2
         h = h.union(hp.box(hp.pin_x(i) - t, hp.pin_x(i) + t, -t, t, -1, hp.PIN_H))
@@ -99,7 +100,7 @@ def sections(here, body, hdr, jaws):
     jw = jaws[0]
     for j in jaws[1:]:
         jw = jw.union(j)
-    items = [(hdr, green, "2EDG 5.08 header (simplified)"), (body, orange, "plug body"),
+    items = [(hdr, green, "header model (socket fits size 1)"), (body, orange, "plug body"),
              (jw, blue, "jaws"), (screws, grey, "M3 bolts")]
     fig, axs = plt.subplots(1, 3, figsize=(17, 6.2), dpi=120)
     draw_section(axs[0], items, (hp.pin_x(1), 0, 0), (1, 0, 0), (1, 2),
@@ -116,34 +117,28 @@ def sections(here, body, hdr, jaws):
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    body, hdr = hp.body(), header()
+    v = hp.SIZE
+    w, length = hp.VARIANTS[v]
+    body, hdr = hp.body(v), header(v)
     jaws = [hp.jaw(i) for i in range(hp.N)]
-    print("clash body/header      %.3f mm3" % vol(body, hdr))
-    print("clash jaws/header      %.3f mm3" % sum(vol(j, hdr) for j in jaws))
-    print("clash jaws/body        %.3f mm3" % sum(vol(j, body) for j in jaws))
-    # jaw pushed back until its nose face would touch the pin (no wire): must still clear the body
-    full = hp.y_lane_open - hp.PIN_T / 2
-    print("clash pushed jaws/body %.3f mm3 (jaw moved %.2f mm)" % (sum(vol(jaw_clamped(i, full), body) for i in range(hp.N)), full))
-    # solid wall check: the nut slots and screw holes must not run into each other or the pockets
-    cuts = [hp.nut_cut(i) for i in range(hp.N)] + [hp.screw_cut(i) for i in range(hp.N)]
+    full = hp.y_lane_open - hp.PIN_T / 2    # jaw pushed until its face would touch the pin (no wire)
+    print(f"size {v}: clash body/header %.3f, jaws/header %.3f, jaws/body %.3f, pushed jaws/body %.3f mm3; body valid {body.val().isValid()}"
+          % (vol(body, hdr), sum(vol(j, hdr) for j in jaws), sum(vol(j, body) for j in jaws),
+             sum(vol(jaw_clamped(i, full), body) for i in range(hp.N))))
     clash = 0.0
     for i in range(hp.N):
         for k in range(hp.N):
             if i != k:
                 clash += vol(hp.nut_cut(i), hp.nut_cut(k)) + vol(hp.nut_cut(i), hp.screw_cut(k))
     print("clash between neighbouring nut slots / screw holes %.3f mm3" % clash)
-    print("body valid:", body.val().isValid(), " volume %.0f mm3" % body.val().Volume())
-
+    # each cell must be sealed from its neighbours inside the socket
+    air = hp.box(-length / 2 + 0.05, length / 2 - 0.05, -w / 2 + 0.05, w / 2 - 0.05,
+                 hp.NOSE_GAP + 0.01, hp.SOCK_H - 0.01).cut(body)
+    pins_in = [sum(s.isInside(cq.Vector(hp.pin_x(i), 0, z)) for i in range(hp.N) for z in (1.0, 4.0, 7.5)) // 3
+               for s in air.val().Solids()]
+    print(f"air pockets in the socket {len(air.val().Solids())}, pins per pocket {pins_in} (no pocket may hold 2)")
     os.makedirs(os.path.join(here, "renders"), exist_ok=True)
     sections(here, body, hdr, jaws)
-    green, orange, blue, metal = (0.35, 0.65, 0.4), (0.95, 0.55, 0.15), (0.25, 0.55, 0.95), (0.75, 0.75, 0.8)
-    fig = plt.figure(figsize=(7, 6), dpi=120)
-    ax = fig.add_subplot(1, 1, 1, projection="3d")
-    draw(ax, [(body, orange, 1.0)] + [(j, blue, 1.0) for j in jaws], 75, -95,
-         "from above: jaws (blue) in their pockets, nut slots, labels")
-    plt.tight_layout()
-    fig.savefig(os.path.join(here, "renders", "plug_preview.png"))
-    print("saved renders/plug_preview.png")
 
 
 if __name__ == "__main__":
