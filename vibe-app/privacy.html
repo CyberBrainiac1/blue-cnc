@@ -10,8 +10,8 @@
   <header><h1>GRBL Prep privacy</h1></header>
   <main style="display:block;max-width:720px">
     <section>
-      <p>GRBL Prep converts G-code in your browser. Files you drop in are read on your own computer and never uploaded anywhere.</p>
-      <p>Inside Onshape, after you sign in, it reads the list of tabs in the document you have open, reads the NC file tab you pick, and adds a new tab when you click "Save to this Onshape document". It doesn't touch anything else in your documents.</p>
+      <p>GRBL Prep makes and converts G-code in your browser. Files you drop in are read on your own computer and never uploaded anywhere. It never connects to your machine; you run the file in gSender.</p>
+      <p>Inside Onshape, after you sign in, it reads the list of tabs in the document you have open, the parts in the Part Studio you pick and the shape of the part you choose, or the NC file tab you pick. It adds a new tab when you click "Save to this Onshape document". It doesn't touch anything else in your documents.</p>
       <p>Signing in goes through a small Cloudflare Worker that swaps Onshape's sign-in code for an access token and passes those document calls on to Onshape. The Worker doesn't store your files, your tokens or anything about you.</p>
       <p>Your machine settings and your sign-in for the current tab are kept in your browser's own storage. There are no ads, no tracking and no accounts.</p>
       <p>Questions: <a href="https://github.com/CyberBrainiac1/blue-cnc/issues">open an issue on GitHub</a>.</p>

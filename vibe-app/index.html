@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>GRBL Prep</h1>
-    <span class="tagline">Turn a flat part into G-code for a GRBL router, then send it.</span>
+    <span class="tagline">Turn a flat part into G-code for a GRBL router.</span>
     <button id="helpButton" class="quiet">Help</button>
   </header>
 
@@ -141,56 +141,17 @@
       <p id="size" class="small"></p>
     </section>
 
-    <section id="sendPanel">
-      <h2><span class="step">5</span>Download or send it</h2>
-      <div class="send">
-        <div class="files">
-          <div class="row">
-            <button id="download" disabled>Download GRBL file</button>
-            <button id="downloadParts" hidden>Download one file per tool</button>
-            <button id="saveOnshape" hidden>Save to this Onshape document</button>
-          </div>
-          <p id="saveNote" class="small"></p>
-        </div>
-        <div class="machine">
-          <p id="noSerial" class="warnings" hidden>Sending needs Chrome or Edge on a laptop. You can still convert and download files here.</p>
-          <div id="inFrame" class="row" hidden>
-            <span>Sending over USB needs GRBL Prep in its own browser tab.</span>
-            <button id="openTab">Open in its own tab to send</button>
-          </div>
-          <div class="row">
-            <button id="connect">Connect to GRBL</button>
-            <span id="state" class="state">Not connected</span>
-            <span id="where"></span>
-          </div>
-          <progress id="progress" value="0" max="1"></progress>
-          <p id="progressText" class="small"></p>
-          <div class="row controls">
-            <button id="home" disabled>Home ($H)</button>
-            <button id="start" disabled>Start job</button>
-            <button id="pause" disabled>Pause</button>
-            <button id="resume" disabled>Resume</button>
-            <button id="stop" class="stop" disabled>STOP</button>
-          </div>
-          <div id="machineMessages"></div>
-        </div>
+    <section id="downloadPanel">
+      <h2><span class="step">5</span>Download it</h2>
+      <div class="row">
+        <button id="download" disabled>Download .nc</button>
+        <button id="downloadParts" hidden>Download one file per tool</button>
+        <button id="saveOnshape" hidden>Save to this Onshape document</button>
       </div>
+      <p id="saveNote" class="small"></p>
+      <p class="small">Open the file in gSender to run it.</p>
     </section>
   </main>
-
-  <dialog id="checklist">
-    <form method="dialog">
-      <h2>Before you start</h2>
-      <label><input type="checkbox" required> Water is coming back out of the spindle.</label>
-      <label><input type="checkbox" required> The end mill is tight in the collet.</label>
-      <label><input type="checkbox" required> You zeroed X, Y and Z on the CAM origin.</label>
-      <label><input type="checkbox" required> Your hand is on the E-stop (the outlet switch).</label>
-      <div class="row">
-        <button value="cancel" formnovalidate class="quiet">Not yet</button>
-        <button id="go" value="go">Start the job</button>
-      </div>
-    </form>
-  </dialog>
 
   <dialog id="help">
     <form method="dialog">
@@ -204,16 +165,15 @@
       <h3>More settings</h3>
       <p>The suggested numbers are gentle on purpose, for a light router with a 1200 mm/min top speed. If a cut sounds rough, lower the depth per pass first. Feeds and spindle speeds above the machine's limits get pulled back down.</p>
       <h3>Already have G-code?</h3>
-      <p>Use the "I already have G-code" tab. Post your toolpath from CAM as plain G-code and drop the file in. The page changes the parts GRBL can't run, lists every change, and draws the path so you can check it before anything moves. Nothing leaves your computer.</p>
+      <p>Use the "I already have G-code" tab. Post your toolpath from CAM as plain G-code and drop the file in. The page changes the parts GRBL can't run, lists every change, and draws the path so you can check it before you cut. Nothing leaves your computer.</p>
       <p>It takes out program numbers, line numbers, tool length offsets and codes GRBL doesn't have. It turns drilling cycles into plain moves, swaps G28 for a lift and a move back to X0 Y0, and fixes dwells written in milliseconds. If a file uses cutter compensation, feed per rev, macros or a fourth axis, it stops and tells you what to change in your CAM.</p>
       <p>Check the warnings. The most important one is when the job is bigger than the machine's travel.</p>
       <h3>Tool changes</h3>
-      <p>GRBL can't change tools by itself. The converted file stops the spindle, lifts Z and pauses at each change. This page can't jog, so for jobs with more than one end mill it's easiest to click "Download one file per tool", run the first file, swap the end mill and re-zero Z in gSender, then run the next one.</p>
+      <p>GRBL can't change tools by itself. The converted file stops the spindle, lifts Z and pauses at each change. For jobs with more than one end mill it's easiest to click "Download one file per tool", run the first file in gSender, swap the end mill and re-zero Z, then run the next one.</p>
       <h3>Which CAM settings to use</h3>
       <p>Onshape CAM Studio: pick the 3-Axis Generic Milling - GRBL machine. Fusion 360: the grbl post. Kiri:Moto: the Any.Generic.Grbl device. SolidWorks CAM: the mach_iii post. In all of them, turn cutter compensation off and set feeds in mm per minute.</p>
-      <h3>Sending</h3>
-      <p>Plug the GRBL board into the laptop with USB and click Connect. This works in Chrome and Edge. The board resets when it connects, so connect before you turn on the spindle's VFD. Home the machine, zero it on the CAM origin in gSender (close gSender before you connect here), then click Start job.</p>
-      <p>Pause holds the motion and Resume carries on. STOP holds the motion and then resets GRBL, so everything stops and the machine needs homing again. If GRBL reports an error, the job pauses and the page says which line and why.</p>
+      <h3>Running the job</h3>
+      <p>GRBL Prep only makes the file. Open the .nc file in gSender, home the machine, zero X, Y and Z where the preview's red cross is, and start the job there.</p>
       <h3>Inside Onshape</h3>
       <p>Click Sign in to Onshape once. GRBL Prep then lists the Part Studios and parts in this document. On the G-code tab it also lists NC files you imported (post from CAM Studio, save the NC file, then use the + menu and Import). "Save to this Onshape document" adds the GRBL file as a new tab, so it's versioned with the part. The page only reads parts and adds file tabs. It never changes your parts.</p>
       <h3>Machine settings</h3>
