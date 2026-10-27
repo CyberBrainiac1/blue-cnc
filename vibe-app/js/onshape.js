@@ -39,13 +39,13 @@ export function keepOnshapeAwake(ctx) {
   setInterval(() => send('keepAlive'), 5 * 60 * 1000);
 }
 
-// Calls back with the ids of whatever is selected in the Part Studio (parts, faces or edges),
-// each time the selection changes.
+// Calls back with everything selected in the Part Studio each time the selection changes, as
+// Onshape sends it: [{ selectionType: 'BODY', selectionId: 'RBCD' }, ...], oldest first. Clicking
+// in the Parts list adds to the selection rather than replacing it.
 export function onSelection(ctx, callback) {
   window.addEventListener('message', e => {
     if (e.origin !== ctx.server || e.data?.messageName !== 'SELECTION') return;
-    fetch(SETUP.worker + '/debug-selection?' + new URLSearchParams({ s: JSON.stringify(e.data.selections) })).catch(() => {}); // TEMP
-    callback((e.data.selections || []).map(s => s.selectionId).filter(Boolean));
+    callback((e.data.selections || []).filter(s => s.selectionId));
   });
 }
 
@@ -193,17 +193,16 @@ export async function listParts(ctx, elementId) {
     .map(p => ({ id: p.partId, name: p.name }));
 }
 
-// The part a selection belongs to. Picking a part in the Parts list gives the part's own id;
-// clicking it in the view gives a face or edge id, so look those up in the Part Studio's bodies.
-export async function partOfSelection(ctx, elementId, ids) {
+// The part the newest selection belongs to. A whole part (BODY) comes with its part id already;
+// a face or edge clicked in the view needs looking up in the Part Studio's bodies.
+export async function partOfSelection(ctx, elementId, selections) {
+  const newest = selections[selections.length - 1];
+  if (!newest) return null;
+  if (newest.selectionType === 'BODY') return newest.selectionId;
   const reply = await api(`/api/v6/partstudios/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/bodydetails`);
   const bodies = (await reply.json()).bodies || [];
-  const owner = id => bodies.find(b => b.id === id || [...(b.faces || []), ...(b.edges || [])].some(f => f.id === id));
-  // the newest selection is last
-  for (const id of [...ids].reverse()) {
-    if (owner(id)) return owner(id).id;
-  }
-  return null;
+  const id = newest.selectionId;
+  return bodies.find(b => b.id === id || [...(b.faces || []), ...(b.edges || [])].some(f => f.id === id))?.id || null;
 }
 
 // The faces of a part and the points along its edges, which is all the CAM needs.

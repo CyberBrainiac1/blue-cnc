@@ -1,7 +1,7 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
 import { toolpath } from './toolpath.js';
 import { drawPath } from './preview.js';
-import * as onshape from './onshape.js?v=4';
+import * as onshape from './onshape.js?v=5';
 import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
@@ -368,10 +368,10 @@ async function readOnshapePart(id, name) {
 
 // Clicking a part, or any face or edge of it, in the Part Studio picks that part.
 let selected = null;
-async function useSelection(ids) {
-  if (!ids.length || !onshape.signedIn()) return;
+async function useSelection(selections) {
+  if (!selections.length || !onshape.signedIn()) return;
   try {
-    const id = await onshape.partOfSelection(onshapeCtx, studioId(), ids);
+    const id = await onshape.partOfSelection(onshapeCtx, studioId(), selections);
     if (!id || id === selected) return;
     selected = id;
     if (!studioParts.some(p => p.id === id)) studioParts = await onshape.listParts(onshapeCtx, studioId());
