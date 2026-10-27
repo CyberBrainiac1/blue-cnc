@@ -10,13 +10,16 @@ export const SETUP = {
 
 const NC_FILE = /\.(nc|ngc|gcode|tap|txt|cnc|g|ncl)$/i;
 
-// Onshape opens the page in an iframe with the document's ids in the query string.
+// Onshape opens the page in an iframe with the document's ids in the query string. The extension's
+// action URL can also leave unfilled "{$documentId}" copies in front of the real ids, so take the
+// first value that looks like an Onshape id (24 hex characters).
 export function onshapeContext() {
   const q = new URLSearchParams(location.search);
-  const documentId = q.get('documentId');
-  const workspaceId = q.get('workspaceId') || q.get('workspaceOrVersionId');
+  const id = (...names) => names.flatMap(n => q.getAll(n)).find(v => /^[0-9a-f]{24}$/.test(v)) || null;
+  const documentId = id('documentId');
+  const workspaceId = id('workspaceId', 'workspaceOrVersionId');
   if (!documentId || !workspaceId) return null;
-  return { documentId, workspaceId, elementId: q.get('elementId'), server: q.get('server') || 'https://cad.onshape.com' };
+  return { documentId, workspaceId, elementId: id('elementId'), server: q.get('server') || 'https://cad.onshape.com' };
 }
 
 export const isSetUp = () => !!(SETUP.clientId && SETUP.worker);
