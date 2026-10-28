@@ -1,7 +1,7 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
 import { toolpath } from './toolpath.js';
 import { drawPath } from './preview.js';
-import * as onshape from './onshape.js?v=7';
+import * as onshape from './onshape.js?v=8';
 import { MATERIALS, BITS, settingsFor } from './cam.js';
 
 const $ = id => document.getElementById(id);
@@ -177,6 +177,7 @@ const camWorker = new Worker(new URL('./camworker.js', import.meta.url), { type:
 
 for (const [key, m] of Object.entries(MATERIALS)) $('material').append(new Option(m.name, key));
 for (const [key, b] of Object.entries(BITS)) $('bit').append(new Option(b.name, key));
+$('bit').value = 'quarter'; // the team's usual end mill; a bit picked before is remembered and wins
 
 function fillSettings() {
   const s = settingsFor($('material').value, $('bit').value);
