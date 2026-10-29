@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './clipper.js';
-import { readPlate, PartError, KIRI_TIP } from '../js/part.js';
+import { readPlate, PartError, TRY_3D } from '../js/part.js';
 import { makeToolpaths, settingsFor } from '../js/cam.js';
 import { TEAM_MACHINE } from '../js/convert.js';
 
@@ -132,5 +132,5 @@ test('a part with no top and bottom (a cone on its base) is refused with the Kir
   const base = Array.from({ length: 24 }, (_, i) => [20 * Math.cos(2 * Math.PI * i / 24), 20 * Math.sin(2 * Math.PI * i / 24)]);
   b.face('PLANE', [0, 0, -1], [20, 0, 0], [b.loop(b.at(base, 0))]);
   b.face('CONE', [0, 0, 1], [0, 0, 0], [b.loop(b.at(base, 0))]);
-  assert.throws(() => readPlate(b.part()), e => e instanceof PartError && e.message.includes(KIRI_TIP));
+  assert.throws(() => readPlate(b.part()), e => e instanceof PartError && e.message.includes(TRY_3D));
 });

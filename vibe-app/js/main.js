@@ -1,8 +1,8 @@
 import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
-import { toolpath } from './toolpath.js';
-import { drawPath } from './preview.js';
-import * as onshape from './onshape.js?v=9';
-import { MATERIALS, BITS, settingsFor } from './cam.js';
+import { toolpath } from './toolpath.js?v=10';
+import { drawPath } from './preview.js?v=10';
+import * as onshape from './onshape.js?v=10';
+import { MATERIALS, BITS, settingsFor } from './cam.js?v=10';
 
 const $ = id => document.getElementById(id);
 
@@ -116,6 +116,7 @@ function setJob(name, lines, kind, source = lines.join('\n')) {
   $('downloadParts').hidden = job.parts.length < 2;
   $('downloadParts').textContent = `Download one file per tool (${job.parts.length} files)`;
   $('cutTime').hidden = true;
+  $('previewTools').hidden = !path.segs.some(s => s.tool > 1);
   drawAll(path);
 }
 
@@ -125,6 +126,7 @@ function clearJob() {
   $('downloadParts').hidden = true;
   $('saveOnshape').hidden = true;
   $('cutTime').hidden = true;
+  $('previewTools').hidden = true;
   drawAll(null);
 }
 
@@ -170,14 +172,15 @@ $('drop').addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
 });
 
-// ---------- cutting a flat part ----------
+// ---------- cutting a part ----------
 
-let part = null; // { name, part } for a sample, { name, body, edges } straight from Onshape
-const camWorker = new Worker(new URL('./camworker.js', import.meta.url), { type: 'module' });
+let part = null; // { name, part, mesh } for a sample, { name, body, edges, faces } straight from Onshape
+const camWorker = new Worker(new URL('./camworker.js?v=10', import.meta.url), { type: 'module' });
 
 for (const [key, m] of Object.entries(MATERIALS)) $('material').append(new Option(m.name, key));
-for (const [key, b] of Object.entries(BITS)) $('bit').append(new Option(b.name, key));
+for (const [key, b] of Object.entries(BITS)) $(b.ball ? 'finishBit' : 'bit').append(new Option(b.name, key));
 $('bit').value = 'quarter'; // the team's usual end mill; a bit picked before is remembered and wins
+$('finishBit').value = 'quarterBall';
 
 function fillSettings() {
   const s = settingsFor($('material').value, $('bit').value);
@@ -199,14 +202,39 @@ function readSettings() {
   return s;
 }
 
+// the finish's own settings come from the ball-nose bit's suggested numbers, with the stepover typed in
+function fillFinish() {
+  $('finishStepover').value = Math.round(settingsFor($('material').value, $('finishBit').value).stepover * 100);
+}
+
+function readFinish() {
+  const s = settingsFor($('material').value, $('finishBit').value);
+  s.stepover = parseFloat($('finishStepover').value) / 100;
+  return s;
+}
+
 function pickMaterial() {
   fillSettings();
-  try { localStorage.setItem('grblprep.cam', JSON.stringify({ material: $('material').value, bit: $('bit').value })); } catch {}
+  fillFinish();
+  rememberBits();
+}
+
+function rememberBits() {
+  try {
+    localStorage.setItem('grblprep.cam', JSON.stringify({ material: $('material').value, bit: $('bit').value, finishBit: $('finishBit').value }));
+  } catch {}
 }
 
 $('material').addEventListener('change', pickMaterial);
 $('bit').addEventListener('change', pickMaterial);
-$('settingsReset').addEventListener('click', fillSettings);
+$('finishBit').addEventListener('change', () => { fillFinish(); rememberBits(); });
+$('settingsReset').addEventListener('click', () => { fillSettings(); fillFinish(); });
+
+function show3d(on) {
+  $('cut3d').checked = on;
+  $('threeD').hidden = !on;
+}
+$('cut3d').addEventListener('change', () => show3d($('cut3d').checked));
 
 function usePart(name, data) {
   part = { name, ...data };
@@ -216,6 +244,7 @@ function usePart(name, data) {
   $('generate').disabled = false;
   $('camResult').hidden = true;
   $('generateNote').textContent = '';
+  show3d(false); // a new part starts out flat; one that isn't gets switched to 3D when it's worked out
 }
 
 async function loadSamples() {
@@ -231,7 +260,7 @@ $('sampleUse').addEventListener('click', async () => {
   const option = $('sampleList').selectedOptions[0];
   if (!option) return;
   const sample = await (await fetch(`samples/${option.value}`)).json();
-  usePart(sample.name, { part: sample.part });
+  usePart(sample.name, { part: sample.part, mesh: sample.mesh });
 });
 
 $('generate').addEventListener('click', () => {
@@ -239,7 +268,7 @@ $('generate').addEventListener('click', () => {
   $('generate').disabled = true;
   $('generateNote').textContent = 'Working it out...';
   const { name, ...data } = part;
-  camWorker.postMessage({ ...data, settings: readSettings(), machine });
+  camWorker.postMessage({ ...data, settings: readSettings(), finish: readFinish(), cut3d: $('cut3d').checked, machine });
 });
 
 function fillList(list, items) {
@@ -264,6 +293,7 @@ camWorker.addEventListener('message', ({ data }) => {
     return;
   }
   const { lines, done, skipped, warnings, minutes, stock, thickness } = data.job;
+  if (data.kind === '3d') show3d(true);
   // eleven "5.5 mm hole" lines read better as one line with a count
   const counts = new Map();
   for (const d of done) counts.set(d, (counts.get(d) || 0) + 1);
@@ -282,7 +312,8 @@ camWorker.addEventListener('message', ({ data }) => {
   }
   setJob(`${part.name}.nc`, lines, 'cam');
   $('cutTime').hidden = false;
-  $('cutTime').textContent = `About ${Math.max(1, Math.round(minutes))} minutes of cutting. Stock: at least ${fmt(Math.ceil(stock.x))} x ${fmt(Math.ceil(stock.y))} mm, ${fmt(+thickness.toFixed(2))} mm thick.`;
+  const change = data.kind === '3d' ? ', plus a stop to change bits' : '';
+  $('cutTime').textContent = `About ${Math.max(1, Math.round(minutes))} minutes of cutting${change}. Stock: at least ${fmt(Math.ceil(stock.x))} x ${fmt(Math.ceil(stock.y))} mm, ${fmt(+thickness.toFixed(2))} mm thick.`;
 });
 
 $('helpButton').addEventListener('click', () => {
@@ -478,12 +509,14 @@ $('saveOnshape').addEventListener('click', async () => {
 fillMachineForm();
 try {
   const last = JSON.parse(localStorage.getItem('grblprep.cam'));
-  if (last && MATERIALS[last.material] && BITS[last.bit]) {
+  if (last && MATERIALS[last.material] && BITS[last.bit] && !BITS[last.bit].ball) {
     $('material').value = last.material;
     $('bit').value = last.bit;
   }
+  if (BITS[last?.finishBit]?.ball) $('finishBit').value = last.finishBit;
 } catch {}
 fillSettings();
+fillFinish();
 loadSamples();
 showTab(true);
 window.grblPrep = { loadText };

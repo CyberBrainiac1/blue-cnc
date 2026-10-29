@@ -4,7 +4,7 @@
 
 import { toInt, unionEvenOdd, union, intersection, offset, area, totalArea, bounds, pieces } from './geom.js';
 
-export const KIRI_TIP = 'For this part, try Kiri:Moto (free in the Onshape App Store), which can do 3D toolpaths.';
+export const TRY_3D = 'Tick "Cut it in 3D" to cut it with 3D toolpaths instead.';
 
 export class PartError extends Error {}
 
@@ -39,7 +39,7 @@ export function compactPart(bodyDetails, tessellatedEdges) {
 export function readPlate(part) {
   if (!part?.faces?.length) throw new PartError('That part has no faces to cut.');
   const planes = part.faces.filter(f => f.type === 'PLANE' && f.normal && f.origin);
-  if (!planes.length) throw new PartError(`That part has no flat faces, so it isn't a plate. ${KIRI_TIP}`);
+  if (!planes.length) throw new PartError(`That part has no flat faces, so it isn't a plate. ${TRY_3D}`);
 
   const edges = new Map((part.edges || []).map(e => [e.id, (e.points || []).map(p => p.map(v => v * 1000))])); // m to mm
   const edgeType = new Map((part.edges || []).map(e => [e.id, e.type]));
@@ -69,7 +69,7 @@ export function readPlate(part) {
     notes.push('The pockets are on the underside of the part in Onshape, so it\'s cut upside down. Put the stock on the machine with that side up.');
   }
   if (!isFinite(side.top) || !isFinite(side.bottom) || side.top - side.bottom < 0.05) {
-    throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${KIRI_TIP}`);
+    throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${TRY_3D}`);
   }
 
   // a right-handed frame on the top, so the part is never cut mirrored
@@ -90,7 +90,7 @@ export function readPlate(part) {
     const region = regionOf(f);
     if (region.length) faces.push({ h: heightOf(f, up) - side.top, region });
   }
-  if (!faces.length) throw new PartError(`Couldn't find a flat top on that part. ${KIRI_TIP}`);
+  if (!faces.length) throw new PartError(`Couldn't find a flat top on that part. ${TRY_3D}`);
   const topArea = totalArea(union(faces.flatMap(f => f.region)));
 
   // Sloped and curved faces (chamfers, rounded edges) can't be cut with a flat end mill. Treat each
@@ -122,7 +122,7 @@ export function readPlate(part) {
     notes.push('Some holes go into the edge of the plate. GRBL Prep can only cut from the top, so drill and tap those by hand.');
   }
   if (oddArea > topArea * 0.3) {
-    throw new PartError(`That part is mostly curved or sloped faces, so it isn't a flat plate. ${KIRI_TIP}`);
+    throw new PartError(`That part is mostly curved or sloped faces, so it isn't a flat plate. ${TRY_3D}`);
   }
   if (sloped) {
     notes.push('Chamfers, rounded edges and other sloped faces, on the top or the bottom, are left square. File or sand them by hand.');
@@ -136,7 +136,7 @@ export function readPlate(part) {
     for (let j = i + 1; j < flats.length; j++) {
       if (Math.abs(flats[i].h - flats[j].h) < 0.001) continue;
       if (totalArea(intersection(flats[i].region, flats[j].region)) > 0.5) {
-        throw new PartError(`That part has an overhang, so some of it can't be reached from the top. ${KIRI_TIP}`);
+        throw new PartError(`That part has an overhang, so some of it can't be reached from the top. ${TRY_3D}`);
       }
     }
   }
@@ -188,7 +188,7 @@ function pickAxis(faces, planes, edges) {
   };
   const scores = candidates.map(flatArea);
   const best = Math.max(...scores);
-  if (!(best > 0)) throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${KIRI_TIP}`);
+  if (!(best > 0)) throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${TRY_3D}`);
   const axis = candidates[scores.indexOf(best)];
 
   // Any other surface (an ellipse or spline wall) is a straight wall too if it stands up along the
@@ -217,7 +217,7 @@ function areaAlong(f, edges, axis) {
 // The turn (radians, under a quarter turn) that fits the footprint in the smallest rectangle, or 0
 // when the part is already square or turning saves under 2 %. The smallest rectangle always has a
 // side along an edge of the convex hull, so only those angles are tried.
-function squaringAngle(paths) {
+export function squaringAngle(paths) {
   const hull = convexHull(paths.flat().map(p => [p.X, p.Y]));
   const boxArea = a => {
     const c = Math.cos(a), s = Math.sin(a);

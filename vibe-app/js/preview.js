@@ -30,7 +30,7 @@ export function drawPath(canvas, path, view = 'top', done = 0) {
   path.segs.forEach((seg, i) => {
     ctx.beginPath();
     ctx.setLineDash(seg.rapid ? [4, 4] : []);
-    ctx.strokeStyle = seg.rapid ? '#aaa' : i < done ? '#2a8' : '#246';
+    ctx.strokeStyle = seg.rapid ? '#aaa' : i < done ? '#2a8' : seg.tool > 1 ? '#c26b00' : '#246';
     ctx.lineWidth = seg.rapid ? 1 : 1.5;
     ctx.moveTo(px(seg.from), py(seg.from));
     ctx.lineTo(px(seg.to), py(seg.to));

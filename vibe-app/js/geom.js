@@ -141,3 +141,17 @@ export function tidy(path, tolerance = 5) {
 }
 
 const dist2 = (p, q) => (p.X - q.X) ** 2 + (p.Y - q.Y) ** 2;
+
+// Where a horizontal line at `y` (mm) crosses the edges of some regions, left to right. Inside is
+// between the 1st and 2nd crossing, the 3rd and 4th, and so on.
+export function scanline(paths, y) {
+  const xs = [];
+  for (const path of paths) {
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[(i + 1) % path.length];
+      const ay = a.Y / SCALE, by = b.Y / SCALE;
+      if ((ay <= y) !== (by <= y)) xs.push((a.X + (y - ay) / (by - ay) * (b.X - a.X)) / SCALE);
+    }
+  }
+  return xs.sort((p, q) => p - q);
+}

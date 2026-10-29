@@ -1,4 +1,5 @@
 // Reads GRBL G-code into straight segments (in mm) for the preview. Arcs get chopped into short lines.
+// Each segment knows which tool cut it: the count goes up at every pause (M0), where the bit changes.
 
 const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
 
@@ -9,6 +10,7 @@ export function toolpath(lines) {
   let absolute = true;
   let scale = 1;
   let plane = 17;
+  let tool = 1;
 
   for (const raw of lines) {
     const code = raw.replace(/\([^)]*\)/g, '').replace(/;.*/, '').toUpperCase();
@@ -17,6 +19,7 @@ export function toolpath(lines) {
     for (const [, k, num] of code.matchAll(WORD)) {
       if (k === 'G') g.push(parseFloat(num));
       else v[k] = parseFloat(num);
+      if (k === 'M' && parseFloat(num) === 0) tool++;
     }
     if (g.includes(20)) scale = 25.4;
     if (g.includes(21)) scale = 1;
@@ -34,16 +37,16 @@ export function toolpath(lines) {
       if (k in v) to[a] = absolute ? v[k] * scale : pos[a] + v[k] * scale;
     }
     if ((motion === 2 || motion === 3) && plane === 17) {
-      arc(segs, pos, to, v, scale, motion === 2);
+      arc(segs, pos, to, v, scale, motion === 2, tool);
     } else {
-      segs.push({ from: pos, to, rapid: motion === 0 });
+      segs.push({ from: pos, to, rapid: motion === 0, tool });
     }
     pos = to;
   }
   return { segs, bounds: boundsOf(segs) };
 }
 
-function arc(segs, from, to, v, scale, clockwise) {
+function arc(segs, from, to, v, scale, clockwise, tool) {
   let cx, cy;
   if ('R' in v) {
     // R arcs: find the centre from the radius. A negative R means the long way round.
@@ -70,7 +73,7 @@ function arc(segs, from, to, v, scale, clockwise) {
     const t = i / steps;
     const a = a0 + sweep * t;
     const p = i === steps ? to : { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), z: from.z + (to.z - from.z) * t };
-    segs.push({ from: prev, to: p, rapid: false });
+    segs.push({ from: prev, to: p, rapid: false, tool });
     prev = p;
   }
 }

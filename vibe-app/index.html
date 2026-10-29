@@ -4,19 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GRBL Prep</title>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
   <header>
     <h1>GRBL Prep</h1>
-    <span class="tagline">Turn a flat part into G-code for a GRBL router.</span>
+    <span class="tagline">Turn a part into G-code for a GRBL router.</span>
     <button id="helpButton" class="quiet">Help</button>
   </header>
 
   <main>
     <section id="filePanel">
       <div class="tabs" role="tablist">
-        <button role="tab" id="tabCam" aria-selected="true" aria-controls="camPanel">Cut a flat part</button>
+        <button role="tab" id="tabCam" aria-selected="true" aria-controls="camPanel">Cut a part</button>
         <button role="tab" id="tabGcode" aria-selected="false" aria-controls="gcodePanel">I already have G-code</button>
       </div>
 
@@ -31,9 +31,9 @@
           </div>
         </div>
         <div class="row minor">
-          <span class="small" id="sampleLabel">Or try a sample plate:</span>
+          <span class="small" id="sampleLabel">Or try a sample part:</span>
           <select id="sampleList"></select>
-          <button id="sampleUse" class="quiet">Use this plate</button>
+          <button id="sampleUse" class="quiet">Use this part</button>
         </div>
         <p id="partNote" class="small"></p>
         <p id="partName" class="picked" hidden></p>
@@ -42,6 +42,14 @@
         <div class="pair">
           <label>Material <select id="material"></select></label>
           <label>Bit <select id="bit"></select></label>
+        </div>
+        <label class="check"><input type="checkbox" id="cut3d"> Cut it in 3D, for curved parts</label>
+        <div id="threeD" hidden>
+          <p class="small">The bit above roughs it out and cuts the outline. Then the job stops so you can put in the ball-nose bit and re-zero Z for the finish.</p>
+          <div class="pair">
+            <label>Finishing bit <select id="finishBit"></select></label>
+            <label>Finishing stepover (% of the bit) <input id="finishStepover" type="number" step="any"></label>
+          </div>
         </div>
         <details id="moreSettings">
           <summary>More settings</summary>
@@ -136,7 +144,7 @@
         <figure><canvas id="top" width="460" height="340"></canvas><figcaption>From above (X and Y)</figcaption></figure>
         <figure><canvas id="side" width="460" height="160"></canvas><figcaption>From the front (X and Z)</figcaption></figure>
       </div>
-      <p class="small">Solid lines cut, dashed lines are rapid moves. The red cross is X0 Y0, the point you zero on.</p>
+      <p class="small">Solid lines cut, dashed lines are rapid moves. The red cross is X0 Y0, the point you zero on.<span id="previewTools" hidden> Orange lines are cut after the bit change.</span></p>
       <p id="cutTime" class="picked" hidden></p>
       <p id="size" class="small"></p>
     </section>
@@ -156,12 +164,15 @@
   <dialog id="help">
     <form method="dialog">
       <h2>How to use GRBL Prep</h2>
-      <h3>Cutting a flat part</h3>
+      <h3>Cutting a part</h3>
       <p>Pick a part from a Part Studio in this document, pick the material and the end mill, and click Make toolpath. GRBL Prep works out the plate's thickness, the outline, the holes and any pockets from the model, and makes the G-code itself. You don't need CAM Studio.</p>
       <p>It cuts in this order: pockets, then holes and cutouts, then the outline. Every cut ramps or spirals down into the material, so the bit never plunges straight in. The outline leaves small tabs holding the part to the stock. Break or saw through them after the job and file the spots smooth.</p>
       <p>Zero X0 Y0 on the front left corner of the stock and Z0 on its top. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline.</p>
+      <h3>Curved parts</h3>
+      <p>A part that isn't a flat plate gets a 3D cut by itself, and "Cut it in 3D" gets ticked. Tick it yourself to cut a plate with chamfers or rounded edges in 3D too. The end mill roughs the part out in layers no deeper than 1.5 mm, leaving a thin skin, and cuts the outline with tabs. Then the job stops: put in the ball-nose bit, re-zero Z only (not X or Y) on the uncut stock near X0 Y0, and resume. Don't zero on the part, which still has a thin skin on it. The ball nose runs back and forth over the part to finish it. A smaller stepover leaves a smoother surface but takes longer.</p>
+      <p>GRBL Prep picks the side to put up, so as little as possible is hidden underneath. Anything under an overhang (an undercut) can't be reached from the top, so it's listed and left solid. Where the part's edge dips lower than the tabs, a lip as tall as the tabs is left on it, so sand that off.</p>
       <h3>What it can't do</h3>
-      <p>It only cuts from the top. Pockets on the other side, holes going into the edge, chamfers and rounded edges get listed and left for you. Holes smaller than the bit are listed too, so drill those by hand. Parts with curved or sloped surfaces need a 3D toolpath, so use Kiri:Moto (free in the Onshape App Store) for those.</p>
+      <p>It only cuts from the top. On a flat part, pockets on the other side, holes going into the edge, chamfers and rounded edges get listed and left for you (or tick "Cut it in 3D"). Holes smaller than the bit are listed too, so drill those by hand.</p>
       <h3>More settings</h3>
       <p>The suggested numbers are gentle on purpose, for a light router with a 1200 mm/min top speed. If a cut sounds rough, lower the depth per pass first. Feeds and spindle speeds above the machine's limits get pulled back down.</p>
       <h3>Already have G-code?</h3>
@@ -169,7 +180,7 @@
       <p>It takes out program numbers, line numbers, tool length offsets and codes GRBL doesn't have. It turns drilling cycles into plain moves, swaps G28 for a lift and a move back to X0 Y0, and fixes dwells written in milliseconds. If a file uses cutter compensation, feed per rev, macros or a fourth axis, it stops and tells you what to change in your CAM.</p>
       <p>Check the warnings. The most important one is when the job is bigger than the machine's travel.</p>
       <h3>Tool changes</h3>
-      <p>GRBL can't change tools by itself. The converted file stops the spindle, lifts Z and pauses at each change. For jobs with more than one end mill it's easiest to click "Download one file per tool", run the first file in gSender, swap the end mill and re-zero Z, then run the next one.</p>
+      <p>GRBL can't change tools by itself. A 3D cut, and a converted file with more than one tool, stops the spindle, lifts Z and pauses at each change. In gSender, swap the bit, re-zero Z and resume. Or click "Download one file per tool" and run the files one after the other, re-zeroing Z between them.</p>
       <h3>Which CAM settings to use</h3>
       <p>Onshape CAM Studio: pick the 3-Axis Generic Milling - GRBL machine. Fusion 360: the grbl post. Kiri:Moto: the Any.Generic.Grbl device. SolidWorks CAM: the mach_iii post. In all of them, turn cutter compensation off and set feeds in mm per minute.</p>
       <h3>Running the job</h3>
@@ -182,6 +193,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/main.js?v=9"></script>
+  <script type="module" src="js/main.js?v=10"></script>
 </body>
 </html>

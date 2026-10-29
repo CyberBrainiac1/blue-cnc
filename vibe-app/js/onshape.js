@@ -218,12 +218,14 @@ export async function partOfSelection(ctx, elementId, selection) {
   return owner(bodies) || null;
 }
 
-// The faces of a part and the points along its edges, which is all the CAM needs.
+// The faces of a part and the points along its edges, which is all a flat part needs, and its
+// surface as triangles for a 3D cut. A flat part still works if the triangles don't come.
 export async function readPart(ctx, elementId, partId) {
   const base = `/api/v6/parts/d/${ctx.documentId}/w/${ctx.workspaceId}/e/${elementId}/partid/${encodeURIComponent(partId)}`;
-  const [body, edges] = await Promise.all([
+  const [body, edges, faces] = await Promise.all([
     api(`${base}/bodydetails?includeGeometricData=true`).then(r => r.json()),
     api(`${base}/tessellatededges?chordTolerance=0.00005&angleTolerance=0.1`).then(r => r.json()),
+    api(`${base}/tessellatedfaces?chordTolerance=0.00002&angleTolerance=0.1&outputFacetNormals=true`).then(r => r.json()).catch(() => null),
   ]);
-  return { body, edges };
+  return { body, edges, faces };
 }

@@ -107,6 +107,8 @@ p { margin: 8px 0; }
 .row.pick select { flex: 1 1 150px; }
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pair label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 550; color: var(--muted); }
+label.check { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-weight: 550; }
+#threeD { margin-top: 4px; }
 
 /* Buttons */
 button {

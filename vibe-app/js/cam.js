@@ -17,6 +17,9 @@ export const BITS = {
   eighth: { name: '1/8" single flute', diameter: 3.175 },
   quarter: { name: '1/4" single flute', diameter: 6.35 },
   mm3: { name: '3 mm single flute', diameter: 3 },
+  // ball-nose bits, only for finishing 3D parts
+  eighthBall: { name: '1/8" ball nose', diameter: 3.175, ball: true },
+  quarterBall: { name: '1/4" ball nose', diameter: 6.35, ball: true },
 };
 
 // Gentle numbers for a light 3040 router (1200 mm/min top speed, 24000 RPM spindle).
@@ -25,16 +28,23 @@ const PRESETS = {
     eighth: { rpm: 18000, feed: 500, doc: 0.4, stepover: 0.35 },
     quarter: { rpm: 16000, feed: 650, doc: 0.5, stepover: 0.35 },
     mm3: { rpm: 18000, feed: 450, doc: 0.35, stepover: 0.35 },
+    // a ball-nose finish only takes the thin layer the roughing leaves, so its stepover is small
+    eighthBall: { rpm: 18000, feed: 600, doc: 0.4, stepover: 0.15 },
+    quarterBall: { rpm: 16000, feed: 700, doc: 0.5, stepover: 0.15 },
   },
   polycarbonate: {
     eighth: { rpm: 16000, feed: 1000, doc: 1.5, stepover: 0.45 },
     quarter: { rpm: 14000, feed: 1200, doc: 2.5, stepover: 0.45 },
     mm3: { rpm: 16000, feed: 900, doc: 1.2, stepover: 0.45 },
+    eighthBall: { rpm: 16000, feed: 1000, doc: 1.5, stepover: 0.15 },
+    quarterBall: { rpm: 14000, feed: 1200, doc: 2.5, stepover: 0.15 },
   },
   wood: {
     eighth: { rpm: 18000, feed: 1200, doc: 2, stepover: 0.45 },
     quarter: { rpm: 16000, feed: 1200, doc: 3.5, stepover: 0.45 },
     mm3: { rpm: 18000, feed: 1100, doc: 1.8, stepover: 0.45 },
+    eighthBall: { rpm: 18000, feed: 1200, doc: 2, stepover: 0.15 },
+    quarterBall: { rpm: 16000, feed: 1200, doc: 3.5, stepover: 0.15 },
   },
 };
 
@@ -64,13 +74,13 @@ export function settingsFor(material, bit) {
 
 export class CamError extends Error {}
 
-const CLEARANCE = 0.5;   // rapid down to this much above the top, then feed the rest
+export const CLEARANCE = 0.5; // rapid down to this much above the top, then feed the rest
 const AIR = 0.2;         // start ramps this far above the floor already cut
-const mm = v => String(+v.toFixed(1)); // sizes in messages, to a tenth of a millimetre
+export const mm = v => String(+v.toFixed(1)); // sizes in messages, to a tenth of a millimetre
 
 // Settings typed into "More settings" can be anything. Refuse the ones that make no sense and pull
 // the rest back inside what the machine can do.
-function tidySettings(given, machine, thickness, warnings) {
+export function tidySettings(given, machine, thickness, warnings) {
   const s = { ...given };
   const bad = (v, lo, hi) => typeof v !== 'number' || !isFinite(v) || v <= lo || v > hi;
   if (bad(s.diameter, 0.2, 25)) throw new CamError('The bit size has to be between 0.2 and 25 mm.');
@@ -219,7 +229,11 @@ export function makeToolpaths(plate, given, machine) {
   }
   if (bodies.length > 1) warnings.push(`This part is ${bodies.length} separate pieces. Each one gets its own outline and tabs.`);
 
-  const lines = job.finish(plate, stock);
+  const lines = job.finish([
+    `GRBL Prep flat part, ${MATERIALS[s.material].name}, ${BITS[s.bit].name} end mill`,
+    `Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(plate.thickness)} mm thick`,
+    'Zero X0 Y0 on the front left corner of the stock and Z0 on its top',
+  ]);
   return { lines, done, skipped, warnings, minutes: job.minutes(), stock, margin, settings: s, plate };
 }
 
@@ -257,12 +271,14 @@ export function depthsDown(from, to, doc, floors = []) {
   return out;
 }
 
-class Job {
+export class Job {
   constructor(s, machine, margin) {
     this.s = s;
+    this.first = s;
+    this.tools = 1;
     this.m = machine;
     this.margin = margin;
-    this.moves = []; // { rapid, x, y, z, f, arc? }
+    this.moves = []; // { rapid, x, y, z, f, arc? }, { note } or { tool }
     this.pos = { x: 0, y: 0, z: machine.safeZ };
   }
 
@@ -301,6 +317,14 @@ class Job {
 
   lift() {
     this.rapidZ(this.m.safeZ);
+  }
+
+  // Stops for a bit change. Everything after it cuts with the new settings.
+  changeTool(s) {
+    this.lift();
+    this.tools++;
+    this.moves.push({ tool: s, n: this.tools });
+    this.s = s;
   }
 
   // Walks a closed loop at a z that can change along it. zAt(distance) gives the height, and
@@ -344,7 +368,8 @@ class Job {
 
   // Cuts a closed loop down to `bottom` in passes, ramping into each one along the loop itself.
   // With tabs, the last bit of every pass rides over the tab tops instead.
-  profile(path, bottom, clockwise, withTabs) {
+  // `top` is how far down the material around the loop is already cut away.
+  profile(path, bottom, clockwise, withTabs, top = 0) {
     let pts = toMm(tidy(path)).map(([x, y]) => this.at(x, y));
     // Clipper hands back anticlockwise outers. Turn it round for clockwise cuts.
     const ccw = area(path) > 0;
@@ -377,9 +402,9 @@ class Job {
     };
 
     // the pass depths, each lap ramping down from the last one
-    const depths = depthsDown(0, bottom, s.doc);
+    const depths = depthsDown(top, bottom, s.doc);
     const laps = [];
-    let zNow = AIR, sNow = 0;
+    let zNow = top + AIR, sNow = 0;
     for (const target of depths) {
       // a short loop can't drop a whole pass in one lap at a gentle angle, so it spirals down over a few
       while (zNow > target + 1e-6) {
@@ -407,7 +432,7 @@ class Job {
       for (const c of tabs) for (const d of [-tabHalf - tabRun, -tabHalf, tabHalf, tabHalf + tabRun]) marks.push(k * len + c + d);
     }
 
-    this.enter(pts[0][0], pts[0][1], 0);
+    this.enter(pts[0][0], pts[0][1], top);
     this.walk(pts, zAt, marks, 0, endS);
     this.lift();
   }
@@ -438,13 +463,14 @@ class Job {
     let floor = 0;
     let loops = 0;
     let missed = 0;
+    // Where the pocket opens onto the edge of the part or a hole, the bit can run on past it,
+    // so let it go up to a bit width outside as long as it stays off the part.
+    const past = offset(region, s.diameter), centres = offset(region, s.diameter - r);
     for (const z of depths) {
-      // Where the pocket opens onto the edge of the part or a hole, the bit can run on past it,
-      // so let it go up to a bit width outside as long as it stays off the part.
-      const open = difference(offset(region, s.diameter), keepAbove(z));
+      const open = difference(past, keepAbove(z));
       // Where the bit's centre can go at this depth without touching the part. Built from outward
       // offsets only: shrinking a messy region in one go can come back closer to the wall than asked.
-      const allowed = closeGaps(difference(offset(region, s.diameter - r), offset(keepAbove(z), r)));
+      const allowed = closeGaps(difference(centres, offset(keepAbove(z), r)));
       const rings = [];
       let ring = allowed;
       while (ring.length && rings.length < 400) {
@@ -506,21 +532,28 @@ class Job {
     return { loops, missed };
   }
 
-  finish(plate, stock) {
-    const s = this.s;
+  // The G-code, with `heading` as comments at the top.
+  finish(heading) {
     const out = [
-      `(GRBL Prep flat part, ${MATERIALS[s.material].name}, ${BITS[s.bit].name} end mill)`,
-      `(Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(plate.thickness)} mm thick)`,
-      '(Zero X0 Y0 on the front left corner of the stock and Z0 on its top)',
+      ...heading.map(h => `(${h.replace(/[()]/g, '')})`),
       'G21 G90 G17 G94',
       `G0 Z${fmt(this.m.safeZ)}`,
-      `M3 S${s.rpm}`,
+      `M3 S${this.first.rpm}`,
       'G4 P3',
     ];
-    let last = { x: null, y: null, z: null, f: null, g: null };
+    const fresh = { x: null, y: null, z: null, f: null };
+    let last = fresh;
     for (const mv of this.moves) {
       if (mv.note) {
         out.push(`(${mv.note.replace(/[()]/g, '')})`);
+        continue;
+      }
+      if (mv.tool) {
+        // The same stop the converter puts in at a tool change, so "one file per tool" splits here.
+        // After the pause Z is zeroed on the new bit's tip, so lift before anything else moves.
+        out.push('M5', `(Change to tool ${mv.n} ${BITS[mv.tool.bit].name}, re-zero Z only on the uncut stock near X0 Y0, then resume)`, 'M0',
+          `G0 Z${fmt(this.m.safeZ)}`, `M3 S${mv.tool.rpm}`, 'G4 P3');
+        last = { ...fresh, z: this.m.safeZ }; // a file split off here has to set its own X, Y and feed
         continue;
       }
       const parts = [];
@@ -541,7 +574,7 @@ class Job {
   minutes() {
     let t = 0, p = { x: 0, y: 0, z: this.m.safeZ };
     for (const mv of this.moves) {
-      if (mv.note) continue;
+      if (mv.note || mv.tool) continue;
       let d;
       if (mv.arc) d = Math.hypot(2 * Math.PI * mv.r, p.z - mv.z);
       else d = Math.hypot(mv.x - p.x, mv.y - p.y, mv.z - p.z);
@@ -580,7 +613,7 @@ function nearestIndex(pts, here) {
 }
 
 // Is every point along this line inside the area the bit's centre is allowed in?
-function insideAll([a, b], allowed, margin) {
+export function insideAll([a, b], allowed, margin) {
   const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.5));
   for (let i = 0; i <= steps; i++) {
     const x = a[0] + (b[0] - a[0]) * i / steps - margin;

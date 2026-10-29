@@ -10,5 +10,9 @@
  {
   "name": "Bearing plate, 1/2 in aluminium",
   "file": "bearing_plate.json"
+ },
+ {
+  "name": "Rounded knob, 3D in plywood",
+  "file": "knob.json"
  }
 ]

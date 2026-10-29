@@ -55,6 +55,7 @@ test('only the Onshape calls the page needs get through', async () => {
     '/api/v6/parts/d/abc/w/def/e/ghi',
     '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/bodydetails',
     '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/tessellatededges',
+    '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/tessellatedfaces',
     '/api/v6/partstudios/d/abc/w/def/e/ghi/bodydetails',
   ]) {
     assert.equal((await ask(path)).status, 200, path);
@@ -62,6 +63,7 @@ test('only the Onshape calls the page needs get through', async () => {
   for (const path of [
     '/api/v6/parts/d/abc/w/def',
     '/api/v6/parts/d/abc/w/def/e/ghi/partid/JHD/massproperties',
+    '/api/v6/partstudios/d/abc/w/def/e/ghi/tessellatedfaces',
     '/api/v6/documents/d/abc',
     '/api/v6/users/sessioninfo',
   ]) {
@@ -69,5 +71,5 @@ test('only the Onshape calls the page needs get through', async () => {
   }
   assert.equal((await ask('/api/v6/blobelements/d/a/w/b/e/c', { method: 'DELETE' })).status, 404);
   assert.equal((await ask('/api/v6/parts/d/abc/w/def/e/ghi', { method: 'POST' })).status, 404);
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 6);
 });
