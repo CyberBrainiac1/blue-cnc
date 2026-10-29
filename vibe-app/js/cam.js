@@ -2,7 +2,7 @@
 // Every way into the material ramps or spirals down. Nothing plunges straight in.
 
 import {
-  SCALE, toMm, tidy, offset, union, difference, intersection, pieces, totalArea, area, reversed, perimeter, asCircle, bounds,
+  SCALE, toMm, tidy, offset, union, difference, intersection, pieces, totalArea, area, reversed, perimeter, asCircle, bounds, band,
 } from './geom.js';
 import { closeGaps } from './part.js';
 import { fmt } from './convert.js';
@@ -74,6 +74,9 @@ export function settingsFor(material, bit) {
 
 export class CamError extends Error {}
 
+// A part too big or too thick to cut flat. Seen another way up, in 3D, it may still fit.
+const wontFit = message => Object.assign(new CamError(message), { wontFit: true });
+
 export const CLEARANCE = 0.5; // rapid down to this much above the top, then feed the rest
 const AIR = 0.2;         // start ramps this far above the floor already cut
 export const mm = v => String(+v.toFixed(1)); // sizes in messages, to a tenth of a millimetre
@@ -122,11 +125,11 @@ export function makeToolpaths(plate, given, machine) {
   const margin = s.diameter + 2;
 
   if (plate.thickness + s.overcut + machine.safeZ > machine.travel.z) {
-    throw new CamError(`The part is ${mm(plate.thickness)} mm thick, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
+    throw wontFit(`The part is ${mm(plate.thickness)} mm thick, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
   }
   const stock = { x: plate.size.x + 2 * margin, y: plate.size.y + 2 * margin };
   if (stock.x > machine.travel.x || stock.y > machine.travel.y) {
-    throw new CamError(`The part needs ${mm(stock.x)} x ${mm(stock.y)} mm of stock, but the machine only travels ${machine.travel.x} x ${machine.travel.y} mm. It won't fit.`);
+    throw wontFit(`The part needs ${mm(stock.x)} x ${mm(stock.y)} mm of stock, but the machine only travels ${machine.travel.x} x ${machine.travel.y} mm. It won't fit.`);
   }
 
   const job = new Job(s, machine, margin);
@@ -463,6 +466,9 @@ export class Job {
     let floor = 0;
     let loops = 0;
     let missed = 0;
+    // Loops a layer was too tight to ramp into and couldn't reach sideways, and how high the stock
+    // still is around them. A later layer can't assume it's down at the last floor there.
+    const left = [];
     // Where the pocket opens onto the edge of the part or a hole, the bit can run on past it,
     // so let it go up to a bit width outside as long as it stays off the part.
     const past = offset(region, s.diameter), centres = offset(region, s.diameter - r);
@@ -482,7 +488,9 @@ export class Job {
       const slope = Math.tan(s.rampAngle * Math.PI / 180);
       let here = null;
       const specks = []; // loops too tight to ramp into, cut sideways once the bit is down next to them
-      const sideways = pts => {
+      const cut = []; // the loops it does cut
+      const sideways = ({ pts, p }) => {
+        cut.push(p);
         this.feed(pts[0][0], pts[0][1], z);
         this.walk(pts, () => z, [], 0, loopLength(pts));
         here = [this.pos.x, this.pos.y];
@@ -499,28 +507,42 @@ export class Job {
           const start = nearestIndex(pts, here);
           pts = pts.slice(start).concat(pts.slice(0, start));
           if (reachable(pts)) {
-            sideways(pts);
+            sideways({ pts, p });
           } else if (len < tightLoop(s)) {
-            specks.push(pts);
+            specks.push({ pts, p });
             continue;
           } else {
-            // ramp down along the ring itself, then go once more round at depth
+            // ramp down along the ring itself, then go once more round at depth, starting over
+            // whatever is highest along it
             this.lift();
-            this.enter(pts[0][0], pts[0][1], floor);
+            this.enter(pts[0][0], pts[0][1], left.length ? stockTop(left, band(p, r), floor) : floor);
             const top = this.pos.z;
             const rampLen = (top - z) / slope;
             this.walk(pts, d => Math.max(z, top - d * slope), [rampLen], 0, rampLen + len);
             here = [this.pos.x, this.pos.y];
+            cut.push(p);
             loops++;
           }
           for (let i = specks.length - 1; i >= 0; i--) {
-            if (!reachable(specks[i])) continue;
+            if (!reachable(specks[i].pts)) continue;
             const back = here;
             sideways(specks.splice(i, 1)[0]);
             if (insideAll([here, back], allowed, this.margin)) this.feed(back[0], back[1], z);
             here = [this.pos.x, this.pos.y];
           }
         }
+      }
+      // What's still standing around each loop it couldn't get to: whatever no loop it cut came
+      // close enough to take off.
+      for (const { p } of specks) {
+        const around = union([...band(p, r), ...(area(p) > 0 ? [p] : [])]);
+        const box = bounds(around), reach = 2 * r;
+        const near = cut.filter(q => {
+          const b = bounds([q]);
+          return b.minX < box.maxX + reach && b.maxX > box.minX - reach && b.minY < box.maxY + reach && b.maxY > box.minY - reach;
+        });
+        const still = near.length ? difference(around, union(near.flatMap(q => band(q, r)))) : around;
+        if (totalArea(still) > 0.01) left.push({ region: still, top: stockTop(left, still, floor) });
       }
       // The rings sit closer together than the bit is wide, so they clear everything inside the
       // outermost one. Areas too tight to ramp into were skipped, so they don't count.
@@ -600,6 +622,14 @@ function tabCenters(len, tabWidth) {
   while (n > 1 && n * tabWidth > len * 0.35) n--;
   // the cut starts halfway between the last tab and the first, as far from both as it can be
   return Array.from({ length: n }, (_, k) => (k + 0.5) * len / n);
+}
+
+// The highest the stock still is anywhere in `region`: `floor`, unless some of it is in a spot
+// left from a layer above.
+function stockTop(left, region, floor) {
+  let top = floor;
+  for (const u of left) if (u.top > top && totalArea(intersection(u.region, region)) > 1e-4) top = u.top;
+  return top;
 }
 
 function nearestIndex(pts, here) {

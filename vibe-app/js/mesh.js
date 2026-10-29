@@ -172,7 +172,7 @@ function build(tris, notes) {
   // Flat faces looking up. Roughing stops just above each one rather than somewhere below it.
   const flat = new Map();
   for (let k = 0; k < tris.length; k += 9) {
-    if (facing(k) < 0.9998) continue;
+    if (facing(k) < 1 - 1e-7) continue; // truly flat: a curved face has facets that only nearly are
     const h = +tris[k + 2].toFixed(2);
     const a = Math.abs(area(toInt([[tris[k], tris[k + 1]], [tris[k + 3], tris[k + 4]], [tris[k + 6], tris[k + 7]]])));
     flat.set(h, (flat.get(h) || 0) + a);
@@ -238,7 +238,9 @@ function heightMap(tris, size) {
     res, nx, ny, ox, oy, z,
     // Where the part is higher than `level`, seen from above: whole cells, as Clipper paths. Runs
     // of cells along a row become one rectangle, and the same run on the next rows makes it taller.
+    // A flat floor right at the level doesn't count (floors are found to the nearest 0.01 mm).
     sliceAbove(level) {
+      level += 0.01;
       const rects = [];
       let open = new Map();
       for (let j = 0; j <= ny; j++) {
@@ -289,17 +291,11 @@ function clip(poly, axis, at, sign) {
   return out;
 }
 
-function distToTriangle(x, y, a, b, c) {
-  const side = (p, q) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]);
-  const s1 = side(a, b), s2 = side(b, c), s3 = side(c, a);
-  if ((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)) return 0;
-  return Math.min(segDist(x, y, a, b), segDist(x, y, b, c), segDist(x, y, c, a));
-}
-
-function segDist(x, y, a, b) {
-  const dx = b[0] - a[0], dy = b[1] - a[1], len2 = dx * dx + dy * dy;
-  const t = len2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / len2)) : 0;
-  return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+// Whether (x, y) is on the triangle starting at tris[k], seen from above, edges included.
+function over(tris, k, x, y) {
+  const side = (p, q) => (tris[q] - tris[p]) * (y - tris[p + 1]) - (tris[q + 1] - tris[p + 1]) * (x - tris[p]);
+  const s1 = side(k, k + 3), s2 = side(k + 3, k + 6), s3 = side(k + 6, k);
+  return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
 }
 
 // Drops a ball-nose bit of radius R straight down onto the part at (x, y) and gives the height its
@@ -345,18 +341,20 @@ export function ballDropper(solid, R) {
           const b = t * 5;
           if (box[b + 4] + R <= best || box[b] > x + R || box[b + 1] < x - R || box[b + 2] > y + R || box[b + 3] < y - R) continue;
           const k = t * 9;
-          for (let c = 0; c < 3; c++) {
-            const p = k + 3 * c, q = k + 3 * ((c + 1) % 3);
-            const dx = x - tris[p], dy = y - tris[p + 1];
-            const d2 = dx * dx + dy * dy;
-            if (d2 <= R2) best = Math.max(best, tris[p + 2] + Math.sqrt(R2 - d2));
-            best = Math.max(best, onEdge(tris[p], tris[p + 1], tris[p + 2], tris[q], tris[q + 1], tris[q + 2], x, y, R2));
-          }
           const nx = plane[t * 4], ny = plane[t * 4 + 1], nz = plane[t * 4 + 2], d = plane[t * 4 + 3];
           if (nz > 1e-6) {
             // the ball's centre sits R off the plane; it touches at the point straight below that
             const cz = (d + R - nx * x - ny * y) / nz;
-            if (cz > best && distToTriangle(x - R * nx, y - R * ny, tris.subarray(k, k + 3), tris.subarray(k + 3, k + 6), tris.subarray(k + 6, k + 9)) === 0) best = cz;
+            if (cz > best && over(tris, k, x - R * nx, y - R * ny)) best = cz;
+          }
+          // a corner or an edge can only hold it up higher than its own top
+          for (let c = 0; c < 3; c++) {
+            const p = k + 3 * c, q = k + 3 * ((c + 1) % 3);
+            if (Math.max(tris[p + 2], tris[q + 2]) + R <= best) continue;
+            const dx = x - tris[p], dy = y - tris[p + 1];
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= R2) best = Math.max(best, tris[p + 2] + Math.sqrt(R2 - d2));
+            best = Math.max(best, onEdge(tris[p], tris[p + 1], tris[p + 2], tris[q], tris[q + 1], tris[q + 2], x, y, R2));
           }
         }
       }

@@ -4,14 +4,17 @@
 
 import './clipper.js';
 import { convert, splitByTool } from '../js/convert.js';
+import { toolpath } from '../js/toolpath.js';
 
 const ALLOWED = new Set(['G0', 'G1', 'G4', 'G17', 'G21', 'G90', 'G94', 'M0', 'M3', 'M5', 'M30']);
+const ARCS = new Set(['G2', 'G3']);
 const NUMBER = /^-?\d+(\.\d+)?$/;
 const fmt = v => String(+(+v).toFixed(3));
 
 // `height(x, y)` is the part's top in the test's own coordinates, and `corner` the front left top
-// corner of the part there, which the CAM moves to X0 Y0 Z0.
-export function check3d(job, { height, corner }, machine) {
+// corner of the part there, which the CAM moves to X0 Y0 Z0. With `flat` it checks a flat part's
+// job (one bit, no finish) against the same surface.
+export function check3d(job, { height, corner }, machine, { flat = false } = {}) {
   const problems = [];
   const say = msg => { if (problems.length < 30) problems.push(msg); };
   const rough = job.settings, finish = job.finish;
@@ -27,8 +30,8 @@ export function check3d(job, { height, corner }, machine) {
     for (const word of code.split(/\s+/)) {
       const letter = word[0], num = word.slice(1);
       if (letter === 'G' || letter === 'M') {
-        if (!ALLOWED.has(word)) say(`code ${word} isn't on the GRBL list`);
-      } else if ('XYZFSP'.includes(letter)) {
+        if (!ALLOWED.has(word) && !(flat && ARCS.has(word))) say(`code ${word} isn't on the GRBL list`);
+      } else if ('XYZFSP'.includes(letter) || (flat && 'IJ'.includes(letter))) {
         if (!NUMBER.test(num)) say(`bad number in "${raw}"`);
         if (letter === 'F') feedTop = Math.max(feedTop, +num);
         if (letter === 'S' && +num > machine.spindleMax) say(`spindle S${num} is over the top speed`);
@@ -43,9 +46,9 @@ export function check3d(job, { height, corner }, machine) {
 
   // ---- the tool change: spindle off, up, which bit and re-zero Z, pause, up again, spindle on
   const stops = job.lines.flatMap((l, i) => (l === 'M0' ? [i] : []));
-  if (stops.length !== 1) say(`${stops.length} pauses, not 1`);
+  if (stops.length !== (flat ? 0 : 1)) say(`${stops.length} pauses, not ${flat ? 0 : 1}`);
   const stop = stops[0];
-  if (stop !== undefined) {
+  if (stop !== undefined && !flat) {
     const before = job.lines.slice(stop - 3, stop), after = job.lines.slice(stop + 1, stop + 3);
     if (before[1] !== 'M5') say(`no M5 before the pause: ${before.join(' | ')}`);
     if (!/^\(Change to tool 2 .*ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume\)$/.test(job.lines[stop - 1])) say(`the pause doesn't say which bit: ${job.lines[stop - 1]}`);
@@ -65,10 +68,11 @@ export function check3d(job, { height, corner }, machine) {
     }
   }
 
-  // ---- read the moves back, each with the bit and the section it belongs to
-  const moves = [];
+  // ---- read the moves back, each with the bit and the section it belongs to (a flat job's arcs
+  // chopped into short lines, as the preview does it)
+  const moves = flat ? toolpath([`G0 Z${machine.safeZ}`, ...job.lines]).segs.slice(1).map(s => ({ ...s, tool: 1, section: '', f: null })) : [];
   let pos = { x: 0, y: 0, z: machine.safeZ }, tool = 1, section = '', f = null;
-  for (const raw of job.lines) {
+  for (const raw of flat ? [] : job.lines) {
     const note = raw.match(/^\((.*)\)$/);
     if (note) { section = note[1]; continue; }
     if (raw === 'M0') { tool = 2; continue; }
@@ -132,8 +136,9 @@ export function check3d(job, { height, corner }, machine) {
         const drop = prev.z - at.z, step = Math.hypot(at.x - prev.x, at.y - prev.y);
         if (drop <= 1e-9 || bite < 0.01) break biteTrack;
         const slope = step < 1e-9 ? Infinity : drop / step;
-        if (!ball && slope > steepest && !(bite <= tabSlack && slope <= 1.01)) {
-          if (plunges++ < 3) say(`steep entry into material with the flat bit at X${fmt(at.x)} Y${fmt(at.y)} Z${fmt(at.z)}, ${fmt(bite)} mm deep`);
+        // (a step of a tenth of a millimetre or so at the end of a tab's ramp only nicks the bit's edge)
+        if (!ball && slope > steepest && bite > 0.15 && !(bite <= tabSlack && slope <= 1.01)) {
+          if (plunges++ < 3) say(`steep entry into material with the flat bit at X${fmt(at.x)} Y${fmt(at.y)} Z${fmt(at.z)}, ${fmt(bite)} mm deep${process.env.DEBUG3D ? " " + JSON.stringify(mv) : ""}`);
         }
         // the ball rides down slopes, but never goes straight down into more than the allowance
         if (ball && slope > 4 && tipBite > a + 0.25) {
@@ -172,6 +177,7 @@ export function check3d(job, { height, corner }, machine) {
   if (gouge.depth > 0.03) say(`gouge: tool ${gouge.tool} (${gouge.section}) cuts ${fmt(gouge.depth)} mm into the part near X${fmt(gouge.x)} Y${fmt(gouge.y)}${process.env.DEBUG3D ? " " + JSON.stringify({ at: gouge.at, mv: gouge.mv }) : ""}`);
   if (thin.depth > 0.03) say(`the roughing comes ${fmt(thin.depth)} mm closer to the part than the allowance, near X${fmt(thin.x)} Y${fmt(thin.y)}`);
   if (lowest < -H - rough.overcut - 0.001) say(`goes down to Z${fmt(lowest)}, below the stock bottom plus overcut`);
+  if (flat) return { problems, left: null, biggestBite };
 
   // ---- the finish left the surface smooth: what's left over the part, where the ball can reach
   const rb = finish.diameter / 2;

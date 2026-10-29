@@ -41,6 +41,16 @@ export function offset(paths, mm) {
   return union(out);
 }
 
+// The strip within `mm` of a closed loop, on both sides of it: what a bit that size sweeps going
+// round it, whichever way round the loop runs.
+export function band(path, mm) {
+  const co = new (C().ClipperOffset)(2, ARC_TOLERANCE);
+  co.AddPath(path, C().JoinType.jtRound, C().EndType.etClosedLine);
+  const out = [];
+  co.Execute(out, mm * SCALE);
+  return out;
+}
+
 function offsetOne(path, mm) {
   const co = new (C().ClipperOffset)(2, ARC_TOLERANCE);
   co.AddPath(path, C().JoinType.jtRound, C().EndType.etClosedPolygon);

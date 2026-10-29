@@ -10,6 +10,10 @@ import { make3dToolpaths } from '../js/cam3d.js';
 import { settingsFor, CamError } from '../js/cam.js';
 import { TEAM_MACHINE, splitByTool, convert } from '../js/convert.js';
 import { check3d } from './check3d.js';
+import { cutPart } from '../js/cutpart.js';
+import { meshToPart, toMesh } from './meshpart.js';
+import { block, axis, parts } from './curved100.js';
+import { tryCurved } from './curvedone.js';
 
 const M = TEAM_MACHINE;
 const tallest = M.travel.z - M.safeZ - 0.5;
@@ -171,4 +175,29 @@ test('the 3D checker catches mistakes planted in good G-code', () => {
     const problems = check3d({ ...job, lines: plant(job.lines) }, shape, M).problems;
     assert.ok(problems.some(p => p.includes(want) || (want === 'straight down' && p.includes('steep entry'))), `${want}: ${problems.join(' | ')}`);
   }
+});
+
+test('a domed block that reads as a plate too thick to cut flat gets a 3D cut instead', () => {
+  const page = tris => ({ part: meshToPart(tris), mesh: toMesh(tris), settings: settingsFor('wood', 'quarter'), finish: settingsFor('wood', 'quarterBall'), machine: M });
+  // no flat top, so the flat reader takes the sides for its top and bottom: a plate 60 thick
+  const domed = block(axis(60, 2), axis(60, 2), (x, y) => 20 + 10 * (1 - ((x - 30) ** 2 + (y - 30) ** 2) / 1800));
+  const { kind, job } = cutPart(page(domed));
+  assert.equal(kind, '3d');
+  assert.match(job.warnings[0], /doesn't fit on the machine as a flat plate/);
+  assert.deepEqual(job.skipped, []);
+  // a plain plate too big for the machine still hears it as a plate
+  assert.throws(() => cutPart(page(block(axis(400, 50), axis(600, 50), () => 6))), e => e instanceof CamError && /stock/.test(e.message));
+});
+
+test('curved test parts that once went wrong pass every check, the way the page cuts them', () => {
+  const all = parts();
+  // a later layer ramped in over a spot the one above couldn't reach; a floor read as above
+  // itself left a band the outline came down into; a tiny outline's tab step
+  for (const name of ['egg crate, 8 mm', '"UP" label', 'micro part']) {
+    const r = tryCurved(all.findIndex(p => p.name.startsWith(name)), 'wood eighthBall');
+    for (const run of r.runs) assert.deepEqual(run.problems, [], `${r.name}, ${run.outcome}${run.ticked ? ' (3D ticked)' : ''}`);
+  }
+  // a gently curved surface has facets that are nearly flat, not flat floors to stop above
+  const long = all.find(p => p.name.startsWith('long part'));
+  assert.deepEqual(readSolid(toMesh(long.tris), tallest).floors, []);
 });
