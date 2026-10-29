@@ -42,6 +42,7 @@ export function readPlate(part) {
   if (!planes.length) throw new PartError(`That part has no flat faces, so it isn't a plate. ${KIRI_TIP}`);
 
   const edges = new Map((part.edges || []).map(e => [e.id, (e.points || []).map(p => p.map(v => v * 1000))])); // m to mm
+  const edgeType = new Map((part.edges || []).map(e => [e.id, e.type]));
   const { axis, odd } = pickAxis(part.faces, planes, edges);
   const outward = f => f.orientation === false ? f.normal.map(v => -v) : f.normal;
   const heightOf = (f, up) => dot(f.origin.map(v => v * 1000), up);
@@ -55,14 +56,20 @@ export function readPlate(part) {
     const floors = ups.filter(f => heightOf(f, up) < top - 0.001).length;
     return { up, ups, downs, top, bottom, floors };
   });
-  const side = sides[1].floors > sides[0].floors ? sides[1] : sides[0];
+  // A plain plate looks the same from both sides, so take the one facing up in Onshape.
+  const upness = ({ up }) => Math.abs(up[2]) > 0.5 ? up[2] : Math.abs(up[1]) > 0.5 ? up[1] : up[0];
+  const side = sides[1].floors !== sides[0].floors
+    ? (sides[1].floors > sides[0].floors ? sides[1] : sides[0])
+    : (upness(sides[1]) > upness(sides[0]) ? sides[1] : sides[0]);
   const other = side === sides[0] ? sides[1] : sides[0];
   const notes = [];
   if (other.floors > 0) {
     notes.push('Some pockets are on the other side of the plate and are skipped. Cut them in a second setup with the plate flipped.');
+  } else if (side.up[2] < -0.5) {
+    notes.push('The pockets are on the underside of the part in Onshape, so it\'s cut upside down. Put the stock on the machine with that side up.');
   }
   if (!isFinite(side.top) || !isFinite(side.bottom) || side.top - side.bottom < 0.05) {
-    throw new PartError('Couldn\'t find a top and a bottom face on that part.');
+    throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${KIRI_TIP}`);
   }
 
   // a right-handed frame on the top, so the part is never cut mirrored
@@ -94,18 +101,21 @@ export function readPlate(part) {
     const region = regionOf(f);
     if (region.length && heights.length) slopes.push({ f, h: Math.min(0, Math.max(...heights)), region });
   }
-  // Highest first. A face hidden under higher ones can't be seen from the top and doesn't matter.
-  // If it's a sideways cylinder, it's a hole into the edge.
+  // A sideways cylinder edged only by circles and arcs is a hole into the edge. Seen from the top
+  // it's just a line, so it has to be picked out before the faces are flattened.
+  const sideHole = f => f.type === 'CYLINDER' && f.normal && square(f.normal, up)
+    && (f.loops || []).every(l => l.coedges.every(([id]) => ['CIRCLE', 'ARC'].includes(edgeType.get(id))));
+  const sideHoles = odd.filter(sideHole).length;
+  // Highest first. A face hidden under higher ones (a chamfer on the bottom, say) can't be cut
+  // from the top either. It's left square like the rest, and still counts as curved below.
   slopes.sort((a, b) => b.h - a.h);
-  let oddArea = 0, sideHoles = 0, sloped = 0;
+  let oddArea = 0, sloped = 0;
   for (const { f, h, region } of slopes) {
-    const above = closeGaps(union(faces.filter(g => g.h > h + 0.001).flatMap(g => g.region)));
-    if (totalArea(intersection(region, above)) > totalArea(region) * 0.9) {
-      if (f.type === 'CYLINDER' && square(f.normal, up)) sideHoles++;
-      continue;
-    }
+    if (sideHole(f)) continue;
     oddArea += totalArea(region);
     sloped++;
+    const above = closeGaps(union(faces.filter(g => g.h > h + 0.001).flatMap(g => g.region)));
+    if (totalArea(intersection(region, above)) > totalArea(region) * 0.9) continue;
     faces.push({ h, region, odd: true });
   }
   if (sideHoles) {
@@ -115,7 +125,7 @@ export function readPlate(part) {
     throw new PartError(`That part is mostly curved or sloped faces, so it isn't a flat plate. ${KIRI_TIP}`);
   }
   if (sloped) {
-    notes.push('Chamfers, rounded edges and other sloped faces are left square. File or sand them by hand.');
+    notes.push('Chamfers, rounded edges and other sloped faces, on the top or the bottom, are left square. File or sand them by hand.');
   }
   // the bottom can stick out past the top (a chamfered or tapered edge), so the outline uses both
   const outlineFaces = side.downs.map(regionOf).filter(r => r.length);
@@ -134,8 +144,17 @@ export function readPlate(part) {
   // shift so the front left corner of the part is X0 Y0 and its top is Z0
   // crumbs thinner than 0.2 mm, left where features nearly overlap, aren't worth an outline
   const whole = pieces(closeGaps(union([...faces.flatMap(f => f.region), ...outlineFaces.flat()])));
-  const footprint = union(whole.map(p => [p.outer, ...p.holes]).filter(p => offset(p, -0.1).length).flat());
+  let footprint = union(whole.map(p => [p.outer, ...p.holes]).filter(p => offset(p, -0.1).length).flat());
   if (!footprint.length) throw new PartError('That part has no area to cut.');
+  // A part drawn at an angle gets turned square to the stock, so it needs no more stock than it would
+  // drawn straight.
+  const angle = squaringAngle(footprint);
+  if (angle) {
+    const turn = paths => rotate(paths, -angle);
+    for (const f of faces) f.region = turn(f.region);
+    footprint = turn(footprint);
+    notes.push(`The part is turned ${Math.round(angle * 180 / Math.PI)} degrees so its edges line up with the stock.`);
+  }
   const box = bounds(footprint);
   const dx = Math.round(box.minX * 1000), dy = Math.round(box.minY * 1000);
   const shift = paths => paths.map(path => path.map(p => ({ X: p.X - dx, Y: p.Y - dy })));
@@ -169,20 +188,75 @@ function pickAxis(faces, planes, edges) {
   };
   const scores = candidates.map(flatArea);
   const best = Math.max(...scores);
-  if (!(best > 0)) throw new PartError('Couldn\'t find a top and a bottom face on that part.');
+  if (!(best > 0)) throw new PartError(`Couldn't find a top and a bottom face on that part, so it isn't a flat plate. ${KIRI_TIP}`);
   const axis = candidates[scores.indexOf(best)];
 
+  // Any other surface (an ellipse or spline wall) is a straight wall too if it stands up along the
+  // axis, which is when it covers no area seen from the top. How much curve the part has is judged
+  // by area later, in readPlate.
   const fits = f => {
-    if (f.type === 'PLANE') return parallel(f.normal, axis) || square(f.normal, axis);
-    if (f.type === 'CYLINDER') return parallel(f.normal, axis);
-    return false;
+    if (f.normal && f.type === 'PLANE') return parallel(f.normal, axis) || square(f.normal, axis);
+    if (f.normal && f.type === 'CYLINDER') return parallel(f.normal, axis);
+    return areaAlong(f, edges, axis) < 0.5;
   };
-  const odd = faces.filter(f => !f.normal || !fits(f));
-  const curved = odd.filter(f => f.type !== 'PLANE' && f.type !== 'CYLINDER');
-  if (curved.length > faces.length * 0.3) {
-    throw new PartError(`That part is mostly curved faces, so it isn't a flat plate. ${KIRI_TIP}`);
+  return { axis, odd: faces.filter(f => !fits(f)) };
+}
+
+// The area of a face seen along `axis`, in mm², from its loops (Newell's method).
+function areaAlong(f, edges, axis) {
+  let total = 0;
+  for (const loop of f.loops || []) {
+    const pts = loopPoints(loop, edges);
+    let sum = 0;
+    pts.forEach((a, i) => { sum += dot(cross(a, pts[(i + 1) % pts.length]), axis); });
+    total += Math.abs(sum) / 2 * (loop.isOuter ? 1 : -1);
   }
-  return { axis, odd };
+  return Math.abs(total);
+}
+
+// The turn (radians, under a quarter turn) that fits the footprint in the smallest rectangle, or 0
+// when the part is already square or turning saves under 2 %. The smallest rectangle always has a
+// side along an edge of the convex hull, so only those angles are tried.
+function squaringAngle(paths) {
+  const hull = convexHull(paths.flat().map(p => [p.X, p.Y]));
+  const boxArea = a => {
+    const c = Math.cos(a), s = Math.sin(a);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of hull) {
+      const u = x * c + y * s, v = y * c - x * s;
+      x0 = Math.min(x0, u); x1 = Math.max(x1, u); y0 = Math.min(y0, v); y1 = Math.max(y1, v);
+    }
+    return (x1 - x0) * (y1 - y0);
+  };
+  let best = 0, bestArea = boxArea(0);
+  hull.forEach((a, i) => {
+    const b = hull[(i + 1) % hull.length];
+    const angle = ((Math.atan2(b[1] - a[1], b[0] - a[0]) % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2);
+    const boxed = boxArea(angle);
+    if (boxed < bestArea * 0.98) { best = angle; bestArea = boxed; }
+  });
+  return best;
+}
+
+function convexHull(points) {
+  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const turn = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = list => {
+    const out = [];
+    for (const p of list) {
+      while (out.length >= 2 && turn(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop();
+      out.push(p);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(pts), ...half([...pts].reverse())];
+}
+
+// Turns Clipper paths by `angle` radians about the origin. Turning keeps each path's direction.
+function rotate(paths, angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return paths.map(path => path.map(p => ({ X: Math.round(p.X * c - p.Y * s), Y: Math.round(p.X * s + p.Y * c) })));
 }
 
 // Area of a flat face in mm², from its loops (Newell's method, so it works at any angle).

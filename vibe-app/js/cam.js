@@ -205,6 +205,11 @@ export function makeToolpaths(plate, given, machine) {
     job.profile(p, zThrough, area(p) > 0 ? s.climb : !s.climb, true);
   }
   for (const body of bodies) done.push(`outline (${mm(perimeter(body.outer))} mm around)`);
+  // the bit can't follow the outline into a gap narrower than itself (comb or sprocket teeth)
+  const filled = totalArea(difference(offset(outlines, -r), bodies.map(b => b.outer))) - perimeterSlack(outlines, r);
+  if (filled > 1) {
+    warnings.push(`Gaps in the outline narrower than the ${mm(s.diameter)} mm bit (about ${mm(filled)} mm²) stay filled in. Use a smaller bit, or cut them by hand.`);
+  }
   if (outlines.filter(p => area(p) > 0).length < bodies.length) {
     warnings.push('Some pieces of this part are closer together than the bit, so they stay joined where they nearly touch.');
   }
