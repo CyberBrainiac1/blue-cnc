@@ -201,6 +201,12 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/main.js?v=13"></script>
+  <script type="module">
+    // GitHub Pages lets a browser keep these files for 10 minutes, so right after an update it
+    // could run new ones next to old ones (and make the wrong G-code). Fetch them fresh, then start.
+    const files = ['cam', 'cam3d', 'convert', 'cutpart', 'geom', 'mesh', 'onshape', 'part', 'preview', 'toolpath'];
+    await Promise.all(files.map(f => fetch(`js/${f}.js`, { cache: 'reload' }).catch(() => {})));
+    await import('./js/main.js?v=14');
+  </script>
 </body>
 </html>
