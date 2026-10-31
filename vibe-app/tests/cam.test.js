@@ -57,7 +57,8 @@ test('parts that are not flat plates get a plain reason', () => {
   assert.throws(() => readPlate(fixture('platte')), e => e instanceof PartError && /overhang/.test(e.message));
   assert.throws(() => readPlate(fixture('bearing_block')), e => e instanceof PartError && /no flat faces/.test(e.message));
   const tall = readPlate(fixture('back_end_plate'));
-  assert.throws(() => makeToolpaths(tall, settingsFor('aluminium', 'eighth'), TEAM_MACHINE), e => e instanceof CamError && /Z travel/.test(e.message));
+  const shortZ = { ...TEAM_MACHINE, travel: { ...TEAM_MACHINE.travel, z: 65 } };
+  assert.throws(() => makeToolpaths(tall, settingsFor('aluminium', 'eighth'), shortZ), e => e instanceof CamError && /Z travel/.test(e.message));
 });
 
 test('silly settings are refused, fast ones are pulled back to the machine limits', () => {

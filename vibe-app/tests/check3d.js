@@ -6,7 +6,7 @@ import './clipper.js';
 import { convert, splitByTool } from '../js/convert.js';
 import { toolpath } from '../js/toolpath.js';
 
-const ALLOWED = new Set(['G0', 'G1', 'G4', 'G17', 'G21', 'G90', 'G94', 'M0', 'M3', 'M5', 'M30']);
+const ALLOWED = new Set(['G0', 'G1', 'G4', 'G17', 'G21', 'G90', 'G94', 'M3', 'M5', 'M6', 'M30']);
 const ARCS = new Set(['G2', 'G3']);
 const NUMBER = /^-?\d+(\.\d+)?$/;
 const fmt = v => String(+(+v).toFixed(3));
@@ -31,7 +31,7 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
       const letter = word[0], num = word.slice(1);
       if (letter === 'G' || letter === 'M') {
         if (!ALLOWED.has(word) && !(flat && ARCS.has(word))) say(`code ${word} isn't on the GRBL list`);
-      } else if ('XYZFSP'.includes(letter) || (flat && 'IJ'.includes(letter))) {
+      } else if ('XYZFSPT'.includes(letter) || (flat && 'IJ'.includes(letter))) {
         if (!NUMBER.test(num)) say(`bad number in "${raw}"`);
         if (letter === 'F') feedTop = Math.max(feedTop, +num);
         if (letter === 'S' && +num > machine.spindleMax) say(`spindle S${num} is over the top speed`);
@@ -45,12 +45,12 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
   if (back.changes.length || back.warnings.length) say(`the converter wanted to change it: ${[...back.changes, ...back.warnings].map(c => c.text || c).slice(0, 2).join('; ')}`);
 
   // ---- the tool change: spindle off, up, which bit and re-zero Z, pause, up again, spindle on
-  const stops = job.lines.flatMap((l, i) => (l === 'M0' ? [i] : []));
+  const stops = job.lines.flatMap((l, i) => (l === 'M6 T2' ? [i] : []));
   if (stops.length !== (flat ? 0 : 1)) say(`${stops.length} pauses, not ${flat ? 0 : 1}`);
   const stop = stops[0];
   if (stop !== undefined && !flat) {
-    const before = job.lines.slice(stop - 3, stop), after = job.lines.slice(stop + 1, stop + 3);
-    if (before[1] !== 'M5') say(`no M5 before the pause: ${before.join(' | ')}`);
+    const before = job.lines.slice(stop - 4, stop), after = job.lines.slice(stop + 1, stop + 3);
+    if (before[1] !== 'M5' || before[2] !== 'G4 P10') say(`no M5 and wait before the pause: ${before.join(' | ')}`);
     if (!/^\(Change to tool 2 .*ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume\)$/.test(job.lines[stop - 1])) say(`the pause doesn't say which bit: ${job.lines[stop - 1]}`);
     if (after[0] !== `G0 Z${machine.safeZ}` || !/^M3 S\d+$/.test(after[1])) say(`no lift and spindle start after the pause: ${after.join(' | ')}`);
     // the tool changes at safe Z: the last move before it ends up there
@@ -75,7 +75,7 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
   for (const raw of flat ? [] : job.lines) {
     const note = raw.match(/^\((.*)\)$/);
     if (note) { section = note[1]; continue; }
-    if (raw === 'M0') { tool = 2; continue; }
+    if (raw === 'M6 T2') { tool = 2; continue; }
     const code = raw.replace(/\([^)]*\)/g, '');
     const g = code.match(/^G([01])\b/);
     if (!g) continue;

@@ -1,8 +1,8 @@
-import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js';
-import { toolpath } from './toolpath.js?v=10';
+import { convert, splitByTool, ConvertError, TEAM_MACHINE, fmt } from './convert.js?v=12';
+import { toolpath } from './toolpath.js?v=12';
 import { drawPath } from './preview.js?v=10';
 import * as onshape from './onshape.js?v=10';
-import { MATERIALS, BITS, settingsFor } from './cam.js?v=11';
+import { MATERIALS, BITS, settingsFor } from './cam.js?v=12';
 
 const $ = id => document.getElementById(id);
 
@@ -175,7 +175,7 @@ $('drop').addEventListener('drop', e => {
 // ---------- cutting a part ----------
 
 let part = null; // { name, part, mesh } for a sample, { name, body, edges, faces } straight from Onshape
-const camWorker = new Worker(new URL('./camworker.js?v=11', import.meta.url), { type: 'module' });
+const camWorker = new Worker(new URL('./camworker.js?v=12', import.meta.url), { type: 'module' });
 
 for (const [key, m] of Object.entries(MATERIALS)) $('material').append(new Option(m.name, key));
 for (const [key, b] of Object.entries(BITS)) $(b.ball ? 'finishBit' : 'bit').append(new Option(b.name, key));

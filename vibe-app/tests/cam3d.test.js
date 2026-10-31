@@ -44,7 +44,7 @@ test('the ball rides on the surface: its tip is a ball radius off the dome, not 
   const R = 25, rb = 3.175;
   const shape = shapes.dome(R);
   const job = cut(shape);
-  const stop = job.lines.indexOf('M0');
+  const stop = job.lines.indexOf('M6 T2');
   // Rows done again sit higher on their first goes, so: never below, and most of them on it.
   let checked = 0, worst = 0, on = 0;
   const at = {};
@@ -103,13 +103,13 @@ test('a groove narrower than the roughing bit: the ball takes it down a layer at
 
 test('the tool change stops safely, says which bit, and splits into two files that run alone', () => {
   const job = cut(shapes.cone(10, 8));
-  const stop = job.lines.indexOf('M0');
-  assert.deepEqual(job.lines.slice(stop - 3, stop + 4), [
-    'G0 Z10', 'M5', '(Change to tool 2 1/4" ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume)', 'M0', 'G0 Z10', 'M3 S16000', 'G4 P3',
+  const stop = job.lines.indexOf('M6 T2');
+  assert.deepEqual(job.lines.slice(stop - 4, stop + 4), [
+    'G0 Z10', 'M5', 'G4 P10', '(Change to tool 2 1/4" ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume)', 'M6 T2', 'G0 Z10', 'M3 S16000', 'G4 P10',
   ]);
   const files = splitByTool(job.lines);
   assert.equal(files.length, 2);
-  assert.deepEqual(files[0].slice(-2), ['M5', 'M30']);
+  assert.deepEqual(files[0].slice(-3), ['M5', 'G4 P10', 'M30']);
   for (const file of files) {
     const back = convert(file.join('\n'), M);
     assert.deepEqual([...back.changes, ...back.warnings], [], 'nothing for the converter to change');
@@ -161,14 +161,14 @@ test("Onshape's facet reply is read, with each triangle wound to match its norma
 test('the 3D checker catches mistakes planted in good G-code', () => {
   const shape = shapes.cone(10, 8);
   const job = cut(shape);
-  const stop = job.lines.indexOf('M0');
+  const stop = job.lines.indexOf('M6 T2');
   // the last pass over a row is the one that rides on the part
   const finishLine = job.lines.findLastIndex(l => /^G1 X.* Z-[1-5]\./.test(l));
   const roughLine = job.lines.findIndex(l => /^G1 .*Z-1\.5/.test(l));
   const planted = {
     'gouge': lines => lines.map((l, i) => (i === finishLine ? l.replace(/Z(-?[\d.]+)/, (_, z) => `Z${(+z - 0.5).toFixed(3)}`) : l)),
     'straight down': lines => [...lines.slice(0, roughLine + 1), 'G1 Z-3', ...lines.slice(roughLine + 1)],
-    'pauses': lines => lines.filter(l => l !== 'M0'),
+    'pauses': lines => lines.filter(l => l !== 'M6 T2'),
     'top speed': lines => lines.map((l, i) => (i === roughLine ? `${l} F2000` : l)),
   };
   for (const [want, plant] of Object.entries(planted)) {
@@ -178,7 +178,9 @@ test('the 3D checker catches mistakes planted in good G-code', () => {
 });
 
 test('a domed block that reads as a plate too thick to cut flat gets a 3D cut instead', () => {
-  const page = tris => ({ part: meshToPart(tris), mesh: toMesh(tris), settings: settingsFor('wood', 'quarter'), finish: settingsFor('wood', 'quarterBall'), machine: M });
+  // on a machine with 65 mm of Z, so the block is too thick to cut flat
+  const shortZ = { ...M, travel: { ...M.travel, z: 65 } };
+  const page = tris => ({ part: meshToPart(tris), mesh: toMesh(tris), settings: settingsFor('wood', 'quarter'), finish: settingsFor('wood', 'quarterBall'), machine: shortZ });
   // no flat top, so the flat reader takes the sides for its top and bottom: a plate 60 thick
   const domed = block(axis(60, 2), axis(60, 2), (x, y) => 20 + 10 * (1 - ((x - 30) ** 2 + (y - 30) ** 2) / 1800));
   const { kind, job } = cutPart(page(domed));

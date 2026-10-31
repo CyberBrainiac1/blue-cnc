@@ -3,11 +3,14 @@
 
 export const TEAM_MACHINE = {
   name: 'Blue desktop CNC',
-  travel: { x: 376, y: 572, z: 65 },   // mm
+  travel: { x: 393, y: 574, z: 72 },   // mm, measured 2026-10-28 ($130-$132)
   maxFeed: { x: 1200, y: 1200, z: 640 }, // mm/min
   spindleMax: 24000,
   safeZ: 10,
 };
+
+// Seconds to wait after the spindle starts or stops. The VFD takes 10 s (Pn08, Pn09) to reach full speed or stop.
+export const SPIN_WAIT = 10;
 
 const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
 const DROP_G = {
@@ -64,14 +67,14 @@ export function convert(source, machine = TEAM_MACHINE) {
   return { lines: c.out, changes: c.changes, warnings: c.warnings, bounds: c.bounds };
 }
 
-// Cuts a converted job into one file per tool, at the pauses toolChange() writes.
+// Cuts a converted job into one file per tool, at the stops toolChange() writes.
 // Each later file gets the units, distance mode and spindle it would have had, so it runs on its own.
 export function splitByTool(lines) {
   const parts = [[]];
   let units = 'G21', distance = 'G90', spindle = null;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const pause = line === 'M0' && /^\(Change to tool/.test(lines[i - 1] || '');
+    const pause = /^M6 T\d+$/.test(line) && /^\(Change to tool/.test(lines[i - 1] || '');
     if (pause) {
       parts[parts.length - 1].pop(); // the "Change to tool" comment
       parts[parts.length - 1].push('M30');
@@ -114,6 +117,9 @@ class Converter {
     this.feed = null;
     this.tool = null;
     this.bounds = null;
+    this.rpm = 0;          // the spindle speed right now, 0 when it's off
+    this.s = null;         // the last S word
+    this.spinWait = false; // the last line sped the spindle up, so wait before cutting
   }
 
   // Report each kind of change once, with the first line it happened on.
@@ -190,6 +196,14 @@ class Converter {
       }
     }
 
+    // the spindle needs time to get up to speed before the next line cuts
+    const waiting = this.spinWait;
+    this.spinWait = false;
+    if (waiting && !g.includes('4')) {
+      this.emit(`G4 P${SPIN_WAIT}`);
+      this.note('spinwait', n, `Added a ${SPIN_WAIT} second wait (G4 P${SPIN_WAIT}) after the spindle starts, so it's at full speed before it cuts.`);
+    }
+
     for (const code of g) {
       if (REFUSE_G[code]) throw new ConvertError(n, raw, `this file uses ${REFUSE_G[code]}, then post again.`);
     }
@@ -226,6 +240,13 @@ class Converter {
     }
     m = m.filter(x => GRBL_M.has(x) || x === '6');
 
+    if (v.S !== undefined) this.s = v.S;
+    if (m.includes('5')) this.rpm = 0;
+    if ((m.includes('3') || m.includes('4')) && (this.s ?? 0) > this.rpm) {
+      this.rpm = this.s;
+      this.spinWait = !g.includes('4');
+    }
+
     if (v.S !== undefined && v.S > this.machine.spindleMax) {
       this.note('smax', n, `The file asks for S${fmt(v.S)} but the spindle tops out at ${this.machine.spindleMax} RPM. GRBL will run it at full speed instead.`, this.warnings);
     }
@@ -245,7 +266,7 @@ class Converter {
     }
 
     if (g.includes('4')) {
-      this.dwell(n, g, m, v, comments);
+      this.dwell(n, g, m, v, comments, waiting);
       return;
     }
 
@@ -281,16 +302,24 @@ class Converter {
   toolChange(n, v, comments) {
     const tool = 'T' in v ? Math.round(v.T) : this.tool;
     let paused = false;
+    // GRBL Prep's own stop is already written out, so only the M6 line goes back in
+    if (/^\(Change to tool/.test(this.out.at(-1) || '')) {
+      this.emit(`M6 T${tool}`);
+      this.tool = tool;
+      return false;
+    }
     if (this.tool === null) {
       this.note('firsttool', n, 'Removed the first tool change (T/M6). Put the first end mill in before you start.');
     } else if (tool !== this.tool) {
       const label = comments.map(c => c.trim().replace(/^change tool to\s*/i, '')).filter(Boolean).join(' ');
       this.emit('M5');
       this.emitAbsolute([`G0 Z${fmt(this.safeZ())}`]);
+      this.emit(`G4 P${SPIN_WAIT}`);
       this.emit(cleanComment(`Change to tool ${tool}${label ? ' ' + label : ''}, re-zero Z, then resume`));
-      this.emit('M0');
+      this.emit(`M6 T${tool}`);
       this.pos.Z = this.safeZ();
-      this.note('toolchange', n, 'Each later tool change now stops the spindle, lifts Z and pauses (M0). Swap the end mill, re-zero Z, then resume.');
+      this.rpm = 0;
+      this.note('toolchange', n, 'Each later tool change now stops the spindle, lifts Z, waits for the spindle to stop and pauses (M6). Swap the end mill, re-zero Z, then resume.');
       paused = true;
     }
     this.tool = tool;
@@ -320,12 +349,17 @@ class Converter {
     return p;
   }
 
-  dwell(n, g, m, v, comments) {
+  dwell(n, g, m, v, comments, spinning) {
     const p = v.P ?? 0;
     const others = g.filter(x => x !== '4').map(x => 'G' + x).concat(m.map(x => 'M' + x));
     comments.forEach(c => this.emit(cleanComment(c)));
     if (others.length) this.emit(others.join(' '));
-    this.emit(`G4 P${fmt(this.dwellSeconds(n, p, comments))}`);
+    let seconds = this.dwellSeconds(n, p, comments);
+    if (spinning && seconds < SPIN_WAIT) {
+      this.note('spinwait', n, `Made the wait after the spindle starts ${SPIN_WAIT} seconds (G4 P${SPIN_WAIT}), so it's at full speed before it cuts.`);
+      seconds = SPIN_WAIT;
+    }
+    this.emit(`G4 P${fmt(seconds)}`);
   }
 
   drillHole(v) {

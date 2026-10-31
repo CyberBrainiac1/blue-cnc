@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GRBL Prep</title>
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header>
@@ -167,9 +167,9 @@
       <h3>Cutting a part</h3>
       <p>Pick a part from a Part Studio in this document, pick the material and the end mill, and click Make toolpath. GRBL Prep works out the plate's thickness, the outline, the holes and any pockets from the model, and makes the G-code itself. You don't need CAM Studio.</p>
       <p>It cuts in this order: pockets, then holes and cutouts, then the outline. Every cut ramps or spirals down into the material, so the bit never plunges straight in. The outline leaves small tabs holding the part to the stock. Break or saw through them after the job and file the spots smooth.</p>
-      <p>Zero X0 Y0 on the front left corner of the stock and Z0 on its top. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline.</p>
+      <p>Zero X0 Y0 on the front left corner of the stock and Z0 on its top. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline. Put a sacrificial board (MDF or plywood) under it: the outline cuts a little past the bottom, and without the board that's into the aluminium table.</p>
       <h3>Curved parts</h3>
-      <p>A part that isn't a flat plate gets a 3D cut by itself, and "Cut it in 3D" gets ticked. Tick it yourself to cut a plate with chamfers or rounded edges in 3D too. The end mill roughs the part out in layers no deeper than 1.5 mm, leaving a thin skin, and cuts the outline with tabs. Then the job stops: put in the ball-nose bit, re-zero Z only (not X or Y) on the uncut stock near X0 Y0, and resume. Don't zero on the part, which still has a thin skin on it. The ball nose runs back and forth over the part to finish it. A smaller stepover leaves a smoother surface but takes longer.</p>
+      <p>A part that isn't a flat plate gets a 3D cut by itself, and "Cut it in 3D" gets ticked. Tick it yourself to cut a plate with chamfers or rounded edges in 3D too. The end mill roughs the part out in layers no deeper than 1.5 mm, leaving a thin skin, and cuts the outline with tabs. Then the job stops the spindle and pauses: put in the ball-nose bit, re-zero Z only (not X or Y) on the uncut stock near X0 Y0, and resume. Don't zero on the part, which still has a thin skin on it. The ball nose runs back and forth over the part to finish it. A smaller stepover leaves a smoother surface but takes longer.</p>
       <p>GRBL Prep picks the side to put up, so as little as possible is hidden underneath. Anything under an overhang (an undercut) can't be reached from the top, so it's listed and left solid. Where the part's edge dips lower than the tabs, a lip as tall as the tabs is left on it, so sand that off.</p>
       <h3>What it can't do</h3>
       <p>It only cuts from the top. On a flat part, pockets on the other side, holes going into the edge, chamfers and rounded edges get listed and left for you (or tick "Cut it in 3D"). Holes smaller than the bit are listed too, so drill those by hand.</p>
@@ -180,11 +180,11 @@
       <p>It takes out program numbers, line numbers, tool length offsets and codes GRBL doesn't have. It turns drilling cycles into plain moves, swaps G28 for a lift and a move back to X0 Y0, and fixes dwells written in milliseconds. If a file uses cutter compensation, feed per rev, macros or a fourth axis, it stops and tells you what to change in your CAM.</p>
       <p>Check the warnings. The most important one is when the job is bigger than the machine's travel.</p>
       <h3>Tool changes</h3>
-      <p>GRBL can't change tools by itself. A 3D cut, and a converted file with more than one tool, stops the spindle, lifts Z and pauses at each change. In gSender, swap the bit, re-zero Z and resume. Or click "Download one file per tool" and run the files one after the other, re-zeroing Z between them.</p>
+      <p>GRBL can't change tools by itself. A 3D cut, and a converted file with more than one tool, stops the spindle, lifts Z, waits 10 seconds for the spindle to stop, and pauses at an M6 line at each change. Keep gSender's Tool Changing setting on Pause (the default). gSender then stops there and still lets you jog and zero, so swap the bit, re-zero Z and resume. (gSender locks jogging at a plain M0, so GRBL Prep doesn't use one.) Or click "Download one file per tool" and run the files one after the other, re-zeroing Z between them.</p>
       <h3>Which CAM settings to use</h3>
       <p>Onshape CAM Studio: pick the 3-Axis Generic Milling - GRBL machine. Fusion 360: the grbl post. Kiri:Moto: the Any.Generic.Grbl device. SolidWorks CAM: the mach_iii post. In all of them, turn cutter compensation off and set feeds in mm per minute.</p>
       <h3>Running the job</h3>
-      <p>GRBL Prep only makes the file. Open the .nc file in gSender, home the machine, zero X, Y and Z where the preview's red cross is, and start the job there.</p>
+      <p>GRBL Prep only makes the file. Open the .nc file in gSender, home the machine, zero X, Y and Z where the preview's red cross is, and start the job there. Before the first cut of a new job, use gSender's Outline to trace the job's edges with the bit up, so you can see it stays on the stock and clear of the clamps. Turn the water pump on first. Every time the spindle starts, the file waits 10 seconds for it to reach full speed before it cuts. Converted files get the same wait.</p>
       <h3>Inside Onshape</h3>
       <p>The first time, click Sign in to Onshape and allow GRBL Prep. After that it connects by itself whenever the tab opens, and lists the Part Studios and parts in this document. In a Part Studio you can also open GRBL Prep from the panel on the right and just click the part (or any face of it) to pick it. On the G-code tab it also lists NC files you imported (post from CAM Studio, save the NC file, then use the + menu and Import). "Save to this Onshape document" adds the GRBL file as a new tab, so it's versioned with the part. The page only reads parts and adds file tabs. It never changes your parts.</p>
       <h3>Machine settings</h3>
@@ -193,6 +193,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/main.js?v=11"></script>
+  <script type="module" src="js/main.js?v=12"></script>
 </body>
 </html>

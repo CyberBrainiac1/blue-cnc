@@ -5,7 +5,7 @@ import {
   SCALE, toMm, tidy, offset, union, difference, intersection, pieces, totalArea, area, reversed, perimeter, asCircle, bounds, band,
 } from './geom.js';
 import { closeGaps } from './part.js';
-import { fmt } from './convert.js';
+import { fmt, SPIN_WAIT } from './convert.js';
 
 export const MATERIALS = {
   aluminium: { name: '6061 aluminium', overcut: 0.3 },
@@ -561,7 +561,7 @@ export class Job {
       'G21 G90 G17 G94',
       `G0 Z${fmt(this.m.safeZ)}`,
       `M3 S${this.first.rpm}`,
-      'G4 P3',
+      `G4 P${SPIN_WAIT}`,
     ];
     const fresh = { x: null, y: null, z: null, f: null };
     let last = fresh;
@@ -572,9 +572,10 @@ export class Job {
       }
       if (mv.tool) {
         // The same stop the converter puts in at a tool change, so "one file per tool" splits here.
+        // gSender pauses at M6 and still lets you jog and zero (it doesn't at M0).
         // After the pause Z is zeroed on the new bit's tip, so lift before anything else moves.
-        out.push('M5', `(Change to tool ${mv.n} ${BITS[mv.tool.bit].name}, re-zero Z only on the uncut stock near X0 Y0, then resume)`, 'M0',
-          `G0 Z${fmt(this.m.safeZ)}`, `M3 S${mv.tool.rpm}`, 'G4 P3');
+        out.push('M5', `G4 P${SPIN_WAIT}`, `(Change to tool ${mv.n} ${BITS[mv.tool.bit].name}, re-zero Z only on the uncut stock near X0 Y0, then resume)`,
+          `M6 T${mv.n}`, `G0 Z${fmt(this.m.safeZ)}`, `M3 S${mv.tool.rpm}`, `G4 P${SPIN_WAIT}`);
         last = { ...fresh, z: this.m.safeZ }; // a file split off here has to set its own X, Y and feed
         continue;
       }

@@ -14,6 +14,7 @@ const OK_M = new Set(['0', '1', '2', '30', '3', '4', '5', '7', '8', '9', '56']);
 
 function assertGrblSafe(lines) {
   for (const line of lines) {
+    if (/^M6 T\d+$/.test(line)) continue; // the tool change stop: gSender pauses there and never sends M6 to GRBL
     const code = line.replace(/\([^)]*\)/g, '');
     assert.ok(!code.includes(';'), `semicolon left in: ${line}`);
     for (const [, k, v] of code.matchAll(/([A-Z])([-+.\d]+)/g)) {
@@ -36,9 +37,10 @@ test('SolidWorks mach_iii post', () => {
   assert.ok(!r.lines.some(l => /M7\b/.test(l)), 'M7 should be gone');
   assert.ok(has(r.lines, 'M8 Z25') || has(r.lines, 'Z25'), 'G43 line keeps its Z move');
   // the second tool pauses the job
-  const pause = r.lines.indexOf('M0');
+  const pause = r.lines.findIndex(l => /^M6 T\d+$/.test(l));
   assert.ok(pause > 0);
-  assert.equal(r.lines[pause - 3], 'M5');
+  assert.equal(r.lines[pause - 4], 'M5');
+  assert.equal(r.lines[pause - 2], 'G4 P10', 'waits for the spindle to stop');
   assert.match(r.lines[pause - 1], /Change to tool 3 5MM DRILL/);
   // G83 at X50 pecks 2.5 mm at a time from R2 down to Z-6
   for (const z of ['-0.5', '-3', '-5.5', '-6']) assert.ok(has(r.lines, `G1 Z${z} F80`), `peck to ${z}`);
@@ -56,7 +58,7 @@ test('Kiri:Moto GRBL device', () => {
   assertGrblSafe(r.lines);
   assert.ok(has(r.lines, 'G4 P1'), 'G4 P1000 (ms) should become one second');
   assert.ok(said(r.changes, 'milliseconds'));
-  assert.ok(has(r.lines, 'M0'), 'second tool pauses the job');
+  assert.ok(r.lines.some(l => /^M6 T\d+$/.test(l)), 'second tool pauses the job');
   assert.ok(r.lines.some(l => l.includes('drill 3mm')), 'the pause says which tool');
   assert.ok(has(r.lines, 'M30'));
 });
@@ -66,7 +68,8 @@ test('Fusion grbl post', () => {
   assertGrblSafe(r.lines);
   assert.ok(has(r.lines, 'G90'));
   assert.ok(has(r.lines, 'G3 X50 Y50 R10'), 'R arcs pass straight through');
-  assert.ok(!has(r.lines, 'M0'), 'only one tool, so no pause');
+  assert.ok(!r.lines.some(l => /^M6/.test(l)), 'only one tool, so no pause');
+  assert.ok(said(r.changes, 'wait'), 'waits for the spindle to speed up');
   assert.ok(said(r.changes, 'G28'));
 });
 
@@ -103,8 +106,8 @@ test('a job bigger than the machine gets a warning', () => {
 });
 
 test('inch files are sized in mm', () => {
-  const r = convert('G20 G90\nG0 X0 Y0 Z0.5\nG1 X15 Y1 F20');
-  assert.ok(r.warnings.some(w => /381 mm in X/.test(w.text)), '15 in is 381 mm, wider than 376');
+  const r = convert('G20 G90\nG0 X0 Y0 Z0.5\nG1 X16 Y1 F20');
+  assert.ok(r.warnings.some(w => /406\.4 mm in X/.test(w.text)), '16 in is 406.4 mm, wider than 393');
 });
 
 test('G90.1 arc centres become relative', () => {
@@ -123,7 +126,7 @@ test('splitting by tool gives files that run on their own', () => {
   const parts = splitByTool(r.lines);
   assert.equal(parts.length, 2);
   assert.equal(parts[0].at(-1), 'M30');
-  assert.ok(!parts[0].includes('M0'));
+  assert.ok(!parts[0].some(l => /^M6/.test(l)));
   assert.deepEqual(parts[1].slice(0, 3), ['G21', 'G90', 'M3 S10000'], 'the drill file starts the spindle before it cuts');
   parts.forEach(assertGrblSafe);
   assert.equal(splitByTool(convert(sample('fusion_grbl.nc')).lines).length, 1);
