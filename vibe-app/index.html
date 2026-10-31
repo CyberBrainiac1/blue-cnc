@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GRBL Prep</title>
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
   <header>
@@ -42,6 +42,7 @@
         <div class="pair">
           <label>Material <select id="material"></select></label>
           <label>Bit <select id="bit"></select></label>
+          <label>Stock thickness (mm) <input id="stockThickness" type="number" step="any" min="0" placeholder="Same as the part"></label>
         </div>
         <label class="check"><input type="checkbox" id="cut3d"> Cut it in 3D, for curved parts</label>
         <div id="threeD" hidden>
@@ -133,6 +134,12 @@
           </fieldset>
           <label>Spindle max RPM <input name="spindleMax" type="number" step="any"></label>
           <label>Safe Z for lifts (mm) <input name="safeZ" type="number" step="any"></label>
+          <label class="check"><input type="checkbox" name="corner.on"> Start every job with the bit at the back right corner, Z all the way up</label>
+          <fieldset>
+            <legend>Stock spot: its front left corner, measured from the start corner (mm)</legend>
+            <label>Left <input name="corner.x" type="number" step="any"></label>
+            <label>Forward <input name="corner.y" type="number" step="any"></label>
+          </fieldset>
           <button type="button" id="machineReset" class="quiet">Back to the blue desktop CNC</button>
         </form>
       </details>
@@ -167,7 +174,7 @@
       <h3>Cutting a part</h3>
       <p>Pick a part from a Part Studio in this document, pick the material and the end mill, and click Make toolpath. GRBL Prep works out the plate's thickness, the outline, the holes and any pockets from the model, and makes the G-code itself. You don't need CAM Studio.</p>
       <p>It cuts in this order: pockets, then holes and cutouts, then the outline. Every cut ramps or spirals down into the material, so the bit never plunges straight in. The outline leaves small tabs holding the part to the stock. Break or saw through them after the job and file the spots smooth.</p>
-      <p>Zero X0 Y0 on the front left corner of the stock and Z0 on its top. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline. Put a sacrificial board (MDF or plywood) under it: the outline cuts a little past the bottom, and without the board that's into the aluminium table.</p>
+      <p>Push the bit to the back right corner with Z all the way up, put the stock's front left corner on the stock spot, and start the job from there. The file sets X and Y from that corner, moves the bit over the stock and pauses: lower the bit onto the top of the stock, zero Z and resume. (Turn off the corner start in Machine settings to zero X0 Y0 on the stock's front left corner yourself instead.) Leave the stock thickness empty when the stock is as thick as the part. When it's thicker, type it in: the cuts then go right through it and the part comes out that thick. The stock needs to be at least the size shown under the preview, and screwed or taped down outside the outline. Put a sacrificial board (MDF or plywood) under it: the outline cuts a little past the bottom, and without the board that's into the aluminium table.</p>
       <h3>Curved parts</h3>
       <p>A part that isn't a flat plate gets a 3D cut by itself, and "Cut it in 3D" gets ticked. Tick it yourself to cut a plate with chamfers or rounded edges in 3D too. The end mill roughs the part out in layers no deeper than 1.5 mm, leaving a thin skin, and cuts the outline with tabs. Then the job stops the spindle and pauses: put in the ball-nose bit, re-zero Z only (not X or Y) on the uncut stock near X0 Y0, and resume. Don't zero on the part, which still has a thin skin on it. The ball nose runs back and forth over the part to finish it. A smaller stepover leaves a smoother surface but takes longer.</p>
       <p>GRBL Prep picks the side to put up, so as little as possible is hidden underneath. Anything under an overhang (an undercut) can't be reached from the top, so it's listed and left solid. Where the part's edge dips lower than the tabs, a lip as tall as the tabs is left on it, so sand that off.</p>
@@ -189,10 +196,11 @@
       <p>The first time, click Sign in to Onshape and allow GRBL Prep. After that it connects by itself whenever the tab opens, and lists the Part Studios and parts in this document. In a Part Studio you can also open GRBL Prep from the panel on the right and just click the part (or any face of it) to pick it. On the G-code tab it also lists NC files you imported (post from CAM Studio, save the NC file, then use the + menu and Import). "Save to this Onshape document" adds the GRBL file as a new tab, so it's versioned with the part. The page only reads parts and adds file tabs. It never changes your parts.</p>
       <h3>Machine settings</h3>
       <p>They start out as the team's blue desktop CNC. Change them to match your router. They're saved in this browser.</p>
+      <p>The stock spot is where the stock's front left corner goes, measured from where the bit sits at the back right corner. To mark it the first time: push the bit to the corner, then in gSender's console type G10 L20 P1 X380 Y560 (your two numbers) and G0 X0 Y0. The bit goes to the spot. Lower it close to the table and mark it, or screw down a stop block for the stock's front and left edges.</p>
       <div class="row"><button value="close">Close</button></div>
     </form>
   </dialog>
 
-  <script type="module" src="js/main.js?v=12"></script>
+  <script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>

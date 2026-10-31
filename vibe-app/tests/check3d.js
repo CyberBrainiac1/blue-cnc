@@ -5,6 +5,7 @@
 import './clipper.js';
 import { convert, splitByTool } from '../js/convert.js';
 import { toolpath } from '../js/toolpath.js';
+import { withoutCornerStart } from './check.js';
 
 const ALLOWED = new Set(['G0', 'G1', 'G4', 'G17', 'G21', 'G90', 'G94', 'M3', 'M5', 'M6', 'M30']);
 const ARCS = new Set(['G2', 'G3']);
@@ -20,10 +21,11 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
   const rough = job.settings, finish = job.finish;
   const part = (x, y) => height(x - job.margin + corner[0], y - job.margin + corner[1]) - corner[2];
   const H = job.solid.height;
+  const lines = withoutCornerStart(job.lines, machine, say);
 
   // ---- plain GRBL, feeds and speeds inside the limits
   let feedTop = 0;
-  for (const raw of job.lines) {
+  for (const raw of lines) {
     const code = raw.replace(/\([^)]*\)/g, '').trim();
     if (!code) continue;
     if (/[;#[\]]|NaN|Infinity|undefined/.test(code)) { say(`odd text in "${raw}"`); continue; }
@@ -45,16 +47,16 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
   if (back.changes.length || back.warnings.length) say(`the converter wanted to change it: ${[...back.changes, ...back.warnings].map(c => c.text || c).slice(0, 2).join('; ')}`);
 
   // ---- the tool change: spindle off, up, which bit and re-zero Z, pause, up again, spindle on
-  const stops = job.lines.flatMap((l, i) => (l === 'M6 T2' ? [i] : []));
+  const stops = lines.flatMap((l, i) => (l === 'M6 T2' ? [i] : []));
   if (stops.length !== (flat ? 0 : 1)) say(`${stops.length} pauses, not ${flat ? 0 : 1}`);
   const stop = stops[0];
   if (stop !== undefined && !flat) {
-    const before = job.lines.slice(stop - 4, stop), after = job.lines.slice(stop + 1, stop + 3);
+    const before = lines.slice(stop - 4, stop), after = lines.slice(stop + 1, stop + 3);
     if (before[1] !== 'M5' || before[2] !== 'G4 P10') say(`no M5 and wait before the pause: ${before.join(' | ')}`);
-    if (!/^\(Change to tool 2 .*ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume\)$/.test(job.lines[stop - 1])) say(`the pause doesn't say which bit: ${job.lines[stop - 1]}`);
+    if (!/^\(Change to tool 2 .*ball nose, re-zero Z only on the uncut stock near X0 Y0, then resume\)$/.test(lines[stop - 1])) say(`the pause doesn't say which bit: ${lines[stop - 1]}`);
     if (after[0] !== `G0 Z${machine.safeZ}` || !/^M3 S\d+$/.test(after[1])) say(`no lift and spindle start after the pause: ${after.join(' | ')}`);
     // the tool changes at safe Z: the last move before it ends up there
-    const lastZ = job.lines.slice(0, stop).reverse().find(l => /\bZ-?[\d.]/.test(l.replace(/\([^)]*\)/g, '')));
+    const lastZ = lines.slice(0, stop).reverse().find(l => /\bZ-?[\d.]/.test(l.replace(/\([^)]*\)/g, '')));
     if (!lastZ || +lastZ.match(/Z(-?[\d.]+)/)[1] < machine.safeZ - 1e-6) say(`the bit isn't lifted before the change: ${lastZ}`);
     const files = splitByTool(job.lines);
     if (files.length !== 2) say(`splits into ${files.length} files, not 2`);
@@ -70,9 +72,9 @@ export function check3d(job, { height, corner }, machine, { flat = false } = {})
 
   // ---- read the moves back, each with the bit and the section it belongs to (a flat job's arcs
   // chopped into short lines, as the preview does it)
-  const moves = flat ? toolpath([`G0 Z${machine.safeZ}`, ...job.lines]).segs.slice(1).map(s => ({ ...s, tool: 1, section: '', f: null })) : [];
+  const moves = flat ? toolpath([`G0 Z${machine.safeZ}`, ...lines]).segs.slice(1).map(s => ({ ...s, tool: 1, section: '', f: null })) : [];
   let pos = { x: 0, y: 0, z: machine.safeZ }, tool = 1, section = '', f = null;
-  for (const raw of flat ? [] : job.lines) {
+  for (const raw of flat ? [] : lines) {
     const note = raw.match(/^\((.*)\)$/);
     if (note) { section = note[1]; continue; }
     if (raw === 'M6 T2') { tool = 2; continue; }

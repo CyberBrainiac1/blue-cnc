@@ -6,7 +6,7 @@ const ready = (async () => {
   const module = { exports: {} };
   new Function('module', 'exports', src)(module, module.exports);
   globalThis.ClipperLib = module.exports;
-  return import('./cutpart.js?v=12');
+  return import('./cutpart.js?v=13');
 })();
 
 self.onmessage = async ({ data }) => {

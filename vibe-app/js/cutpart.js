@@ -15,7 +15,8 @@ export function cutPart(data) {
   if (!data.cut3d && (data.part || data.body)) {
     try {
       const plate = readPlate(data.part || compactPart(data.body, data.edges));
-      return { kind: 'flat', job: makeToolpaths(plate, data.settings, data.machine), thickness: plate.thickness };
+      const job = makeToolpaths(plate, data.settings, data.machine);
+      return { kind: 'flat', job, thickness: job.thickness };
     } catch (err) {
       // A domed block can read as a tall plate lying on its side, say, which won't fit flat.
       const another = err instanceof PartError || (err instanceof CamError && err.wontFit);
@@ -36,5 +37,5 @@ export function cutPart(data) {
   }
   if (notFlat instanceof PartError) job.warnings.unshift("This part isn't a flat plate, so it gets a 3D cut.");
   if (notFlat instanceof CamError) job.warnings.unshift("This part doesn't fit on the machine as a flat plate, so it gets a 3D cut.");
-  return { kind: '3d', job, thickness: solid.height };
+  return { kind: '3d', job, thickness: job.thickness };
 }

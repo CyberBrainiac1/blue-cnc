@@ -1,5 +1,6 @@
 // Reads GRBL G-code into straight segments (in mm) for the preview. Arcs get chopped into short lines.
-// Each segment knows which tool cut it: the count goes up at every tool change stop (M6).
+// Each segment knows which tool cut it: the count goes up at every tool change stop (M6) after
+// the first cut. (An M6 before any cut is only the pause to zero Z.)
 
 const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
 
@@ -19,7 +20,7 @@ export function toolpath(lines) {
     for (const [, k, num] of code.matchAll(WORD)) {
       if (k === 'G') g.push(parseFloat(num));
       else v[k] = parseFloat(num);
-      if (k === 'M' && parseFloat(num) === 6) tool++;
+      if (k === 'M' && parseFloat(num) === 6 && segs.some(s => !s.rapid)) tool++;
     }
     if (g.includes(20)) scale = 25.4;
     if (g.includes(21)) scale = 1;

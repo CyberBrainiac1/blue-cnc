@@ -9,7 +9,7 @@
 import { SCALE, offset, union, difference, pieces, reversed, perimeter, area, bounds, scanline, tidy } from './geom.js';
 import { closeGaps } from './part.js';
 import { quarterTurn, ballDropper } from './mesh.js';
-import { BITS, MATERIALS, CamError, Job, tidySettings, depthsDown, insideAll, mm } from './cam.js';
+import { BITS, MATERIALS, CamError, Job, tidySettings, depthsDown, insideAll, mm, stockDepth, cornerFit, zeroNote } from './cam.js';
 
 // what the roughing leaves on the part for the finish to take off
 const ALLOWANCE = { aluminium: 0.3, polycarbonate: 0.4, wood: 0.5 };
@@ -19,7 +19,9 @@ export function make3dToolpaths(solid, roughGiven, finishGiven, machine) {
   if (!BITS[finishGiven.bit]?.ball) throw new CamError('The finish needs a ball-nose bit.');
   const warnings = [...solid.notes];
   const H = solid.height;
-  const rough = tidySettings(roughGiven, machine, H, warnings);
+  // cuts right through go to the stock's bottom, which can be lower than the part's
+  const thick = stockDepth(H, roughGiven.stock, warnings);
+  const rough = tidySettings(roughGiven, machine, thick, warnings);
   const more = [];
   const finish = tidySettings(finishGiven, machine, H, more);
   for (const w of more) if (!warnings.includes(w)) warnings.push(w);
@@ -34,13 +36,14 @@ export function make3dToolpaths(solid, roughGiven, finishGiven, machine) {
   const margin = wide + rough.diameter + 8;
   const fits = size => size.x + 2 * margin <= machine.travel.x && size.y + 2 * margin <= machine.travel.y;
   if (!fits(solid.size) && fits({ x: solid.size.y, y: solid.size.x })) solid = quarterTurn(solid);
-  if (H + rough.overcut + machine.safeZ > machine.travel.z) {
-    throw new CamError(`The part is ${mm(H)} mm tall, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
+  if (thick + rough.overcut + machine.safeZ > machine.travel.z) {
+    throw new CamError(`The part is ${mm(thick)} mm tall, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
   }
   const stock = { x: solid.size.x + 2 * margin, y: solid.size.y + 2 * margin };
   if (stock.x > machine.travel.x || stock.y > machine.travel.y) {
     throw new CamError(`The part needs ${mm(stock.x)} x ${mm(stock.y)} mm of stock, but the machine only travels ${machine.travel.x} x ${machine.travel.y} mm. It won't fit.`);
   }
+  cornerFit(stock, machine);
   // Nothing below the tab tops gets cut until the outline, so the part stays held while it's
   // roughed and finished. Where the part dips lower than that, a lip that high is left on it.
   if (rough.tabHeight < 0.5) {
@@ -48,7 +51,7 @@ export function make3dToolpaths(solid, roughGiven, finishGiven, machine) {
     warnings.push(`The tabs are ${mm(rough.tabHeight)} mm tall, because they hold the part while it's finished.`);
   }
   const floor = -H + rough.tabHeight;
-  const zThrough = -H - rough.overcut;
+  const zThrough = -thick - rough.overcut;
 
   const job = new Job(rough, machine, margin);
   const done = [];
@@ -188,17 +191,17 @@ export function make3dToolpaths(solid, roughGiven, finishGiven, machine) {
   job.lift();
   done.push(`finish, ${rows} passes ${mm(step)} mm apart${again ? `, and ${again} again where there was too much left to take off in one go` : ''}`);
   if (todo.length) warnings.push("Some spots the roughing bit couldn't reach are still not finished after 40 passes. Use a smaller roughing bit.");
-  if (H > rough.diameter * 4 || H > finish.diameter * 4) {
-    warnings.push(`The cut goes ${mm(H + rough.overcut)} mm deep. Check that both bits' flutes are at least that long, and that nothing but the flutes can touch the part.`);
+  if (thick > rough.diameter * 4 || H > finish.diameter * 4) {
+    warnings.push(`The cut goes ${mm(thick + rough.overcut)} mm deep. Check that both bits' flutes are at least that long, and that nothing but the flutes can touch the part.`);
   }
 
   const lines = job.finish([
     `GRBL Prep 3D part, ${MATERIALS[rough.material].name}`,
     `Tool 1: ${BITS[rough.bit].name} end mill for the roughing and the outline. Tool 2: ${BITS[finish.bit].name} for the finish`,
-    `Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(H)} mm thick`,
-    'Zero X0 Y0 on the front left corner of the stock and Z0 on its top',
+    `Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(thick)} mm thick`,
+    zeroNote(machine),
   ]);
-  return { lines, done, skipped, warnings, minutes: job.minutes(), stock, margin, settings: rough, finish, solid, allowance, floor };
+  return { lines, done, skipped, warnings, minutes: job.minutes(), stock, margin, settings: rough, finish, solid, allowance, floor, thickness: thick };
 }
 
 // The ball's path from a to b (x, y) riding on the surface, as [x, y, z] points: sampled every

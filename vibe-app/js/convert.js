@@ -7,6 +7,9 @@ export const TEAM_MACHINE = {
   maxFeed: { x: 1200, y: 1200, z: 640 }, // mm/min
   spindleMax: 24000,
   safeZ: 10,
+  // Every job starts with the bit pushed to the back right corner, Z all the way up. The stock's
+  // front left corner sits this far left of (x) and in front of (y) that spot.
+  corner: { on: true, x: 380, y: 560 },
 };
 
 // Seconds to wait after the spindle starts or stops. The VFD takes 10 s (Pn08, Pn09) to reach full speed or stop.
@@ -303,7 +306,7 @@ class Converter {
     const tool = 'T' in v ? Math.round(v.T) : this.tool;
     let paused = false;
     // GRBL Prep's own stop is already written out, so only the M6 line goes back in
-    if (/^\(Change to tool/.test(this.out.at(-1) || '')) {
+    if (/^\((Change to tool|Zero Z here)/.test(this.out.at(-1) || '')) {
       this.emit(`M6 T${tool}`);
       this.tool = tool;
       return false;

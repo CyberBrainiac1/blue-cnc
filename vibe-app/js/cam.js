@@ -81,6 +81,35 @@ export const CLEARANCE = 0.5; // rapid down to this much above the top, then fee
 const AIR = 0.2;         // start ramps this far above the floor already cut
 export const mm = v => String(+v.toFixed(1)); // sizes in messages, to a tenth of a millimetre
 
+// How deep the cuts right through go: the stock's thickness, when it's typed in and thicker than the part.
+export function stockDepth(part, stock, warnings) {
+  if (!stock) return part;
+  if (stock < part - 0.05) throw new CamError(`The stock is ${mm(stock)} mm thick, thinner than the part (${mm(part)} mm). Use thicker stock, or leave the stock thickness empty.`);
+  if (stock <= part + 0.05) return part;
+  warnings.push(`The stock is ${mm(stock)} mm thick and the part ${mm(part)} mm, so the cuts go right through the stock and the part comes out ${mm(stock)} mm thick. Sand or face the bottom down, or use ${mm(part)} mm stock.`);
+  return stock;
+}
+
+// With the corner start on, the bit starts at the back right corner, so the stock has to fit
+// between its spot and that corner, and the spot has to be inside the machine's travel.
+export function cornerFit(stock, machine) {
+  const c = machine.corner;
+  if (!c?.on) return;
+  if (!(c.x > 0 && c.y > 0 && c.x <= machine.travel.x && c.y <= machine.travel.y)) {
+    throw new CamError(`The stock spot has to be within the machine's travel (${machine.travel.x} x ${machine.travel.y} mm) of the start corner. Fix it in Machine settings.`);
+  }
+  if (stock.x > c.x || stock.y > c.y) {
+    throw new CamError(`The part needs ${mm(stock.x)} x ${mm(stock.y)} mm of stock, but from the stock spot there's only ${mm(c.x)} x ${mm(c.y)} mm before the start corner. Move the stock spot in Machine settings.`);
+  }
+}
+
+// The heading line that says where to zero.
+export function zeroNote(machine) {
+  return machine.corner?.on
+    ? 'Start with the bit at the back right corner, Z all the way up, and the stock on its spot. Zero Z on the stock top when the job pauses'
+    : 'Zero X0 Y0 on the front left corner of the stock and Z0 on its top';
+}
+
 // Settings typed into "More settings" can be anything. Refuse the ones that make no sense and pull
 // the rest back inside what the machine can do.
 export function tidySettings(given, machine, thickness, warnings) {
@@ -118,19 +147,21 @@ export function makeToolpaths(plate, given, machine) {
     plate = quarterTurn(plate);
     warnings.push('The part is turned a quarter turn so it fits on the machine.');
   }
-  const s = tidySettings(given, machine, plate.thickness, warnings);
+  const thick = stockDepth(plate.thickness, given.stock, warnings);
+  const s = tidySettings(given, machine, thick, warnings);
   const r = s.diameter / 2;
-  const zBottom = -plate.thickness;
+  const zBottom = -thick;
   const zThrough = zBottom - s.overcut;
   const margin = s.diameter + 2;
 
-  if (plate.thickness + s.overcut + machine.safeZ > machine.travel.z) {
-    throw wontFit(`The part is ${mm(plate.thickness)} mm thick, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
+  if (thick + s.overcut + machine.safeZ > machine.travel.z) {
+    throw wontFit(`The part is ${mm(thick)} mm thick, which is more than the machine's Z travel (${machine.travel.z} mm) can cut with a ${mm(machine.safeZ)} mm lift.`);
   }
   const stock = { x: plate.size.x + 2 * margin, y: plate.size.y + 2 * margin };
   if (stock.x > machine.travel.x || stock.y > machine.travel.y) {
     throw wontFit(`The part needs ${mm(stock.x)} x ${mm(stock.y)} mm of stock, but the machine only travels ${machine.travel.x} x ${machine.travel.y} mm. It won't fit.`);
   }
+  cornerFit(stock, machine);
 
   const job = new Job(s, machine, margin);
   const skipped = [];
@@ -234,10 +265,10 @@ export function makeToolpaths(plate, given, machine) {
 
   const lines = job.finish([
     `GRBL Prep flat part, ${MATERIALS[s.material].name}, ${BITS[s.bit].name} end mill`,
-    `Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(plate.thickness)} mm thick`,
-    'Zero X0 Y0 on the front left corner of the stock and Z0 on its top',
+    `Stock: at least ${mm(stock.x)} x ${mm(stock.y)} mm, ${mm(thick)} mm thick`,
+    zeroNote(machine),
   ]);
-  return { lines, done, skipped, warnings, minutes: job.minutes(), stock, margin, settings: s, plate };
+  return { lines, done, skipped, warnings, minutes: job.minutes(), stock, margin, settings: s, plate, thickness: thick };
 }
 
 // Turns the plate 90 degrees anticlockwise and moves it back to X0 Y0.
@@ -559,6 +590,7 @@ export class Job {
     const out = [
       ...heading.map(h => `(${h.replace(/[()]/g, '')})`),
       'G21 G90 G17 G94',
+      ...this.cornerStart(),
       `G0 Z${fmt(this.m.safeZ)}`,
       `M3 S${this.first.rpm}`,
       `G4 P${SPIN_WAIT}`,
@@ -592,6 +624,20 @@ export class Job {
     }
     out.push(`G0 Z${fmt(this.m.safeZ)}`, 'M5', 'G0 X0 Y0', 'M30');
     return out;
+  }
+
+  // The bit starts at the back right corner, so that's where X and Y get zeroed from. Then it goes
+  // over the stock and pauses (M6, so gSender still lets you jog) for Z to be zeroed on the top.
+  cornerStart() {
+    const c = this.m.corner;
+    if (!c?.on) return [];
+    return [
+      'G54',
+      `G10 L20 P1 X${fmt(c.x)} Y${fmt(c.y)}`,
+      'G0 X10 Y10',
+      '(Zero Z here: lower the bit onto the top of the stock, zero Z, then resume)',
+      'M6 T1',
+    ];
   }
 
   minutes() {

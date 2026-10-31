@@ -53,7 +53,12 @@ export function readSolid(mesh, maxHeight = Infinity) {
   for (let k = 0; k < mm.length; k += 9) volume += dot(mm.subarray(k, k + 3), cross(mm.subarray(k + 3, k + 6), mm.subarray(k + 6, k + 9))) / 6;
   const looks = SIDES.map(side => ({ side, ...look(placed(mm, side.up)) }));
   const fitting = looks.filter(l => l.height <= maxHeight);
-  const pick = (fitting.length ? fitting : looks).reduce((best, l) => (l.under < best.under - Math.max(1, 0.01 * Math.abs(volume)) ? l : best));
+  const pool = fitting.length ? fitting : looks;
+  const least = Math.min(...pool.map(l => l.under));
+  const near = pool.filter(l => l.under <= least + Math.max(1, 0.01 * Math.abs(volume)));
+  // of the sides about as good as the best, the lowest: shorter cuts, and a part that can lie
+  // down isn't stood on end (ties go to the way it's drawn)
+  const pick = near.reduce((best, l) => (l.height < best.height - 1 ? l : best));
   const notes = pick.side.note ? [pick.side.note] : [];
   const tris = placed(mm, pick.side.up);
 

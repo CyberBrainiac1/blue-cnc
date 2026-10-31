@@ -75,6 +75,7 @@ function one(p, data, material, ball, flatIn, before) {
   // every move inside the stock
   let x = 0, y = 0, outside = 0;
   for (const l of job.lines) {
+    if (/^G10\b/.test(l)) continue; // the corner start sets the zero, it doesn't move
     const mx = l.match(/X(-?[\d.]+)/), my = l.match(/Y(-?[\d.]+)/);
     if (mx) x = +mx[1];
     if (my) y = +my[1];

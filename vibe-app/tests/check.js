@@ -10,6 +10,23 @@ import { toMm, offset, union, intersection, difference, pieces, bounds, perimete
 const ALLOWED = new Set(['G0', 'G1', 'G2', 'G3', 'G4', 'G17', 'G21', 'G90', 'G94', 'M3', 'M5', 'M30']);
 const NUMBER = /^-?\d+(\.\d+)?$/;
 
+// The corner start (Machine settings) sets X and Y from the back right corner, moves over the stock
+// and pauses for Z to be zeroed, before anything else moves. Checks that, then leaves it out, so
+// the rest reads like a job zeroed on the stock.
+export function withoutCornerStart(lines, machine, say) {
+  const c = machine.corner;
+  if (!c?.on) return lines;
+  const want = ['G54', `G10 L20 P1 X${+c.x.toFixed(3)} Y${+c.y.toFixed(3)}`, 'G0 X10 Y10',
+    '(Zero Z here: lower the bit onto the top of the stock, zero Z, then resume)', 'M6 T1'];
+  const at = lines.indexOf('G54');
+  if (at < 0 || lines.slice(at, at + want.length).join('\n') !== want.join('\n')) {
+    say(`no corner start: ${lines.slice(at, at + want.length).join(' | ')}`);
+    return lines;
+  }
+  if (lines.slice(0, at).some(l => !/^\(.*\)$/.test(l) && l !== 'G21 G90 G17 G94')) say('something runs before the corner start');
+  return [...lines.slice(0, at), ...lines.slice(at + want.length)];
+}
+
 export function checkJob(job, given, machine) {
   const plate = job.plate || given; // the CAM may have turned it to fit
   const problems = [];
@@ -18,10 +35,11 @@ export function checkJob(job, given, machine) {
   const zThrough = -plate.thickness - s.overcut;
   const tabTop = -plate.thickness + s.tabHeight; // tabs stand up from the bottom of the part
   const say = msg => { if (problems.length < 30) problems.push(msg); };
+  const lines = withoutCornerStart(job.lines, machine, say);
 
   // ---- every line is plain GRBL 1.1 with real numbers
   let feedTop = 0;
-  for (const raw of job.lines) {
+  for (const raw of lines) {
     const code = raw.replace(/\([^)]*\)/g, '').trim();
     if (!code) continue;
     if (/[;#[\]]|NaN|Infinity|undefined/.test(code)) { say(`odd text in "${raw}"`); continue; }
@@ -47,7 +65,7 @@ export function checkJob(job, given, machine) {
   }
 
   // ---- where the bit goes
-  const segs = toolpath(job.lines).segs;
+  const segs = toolpath(lines).segs;
   let lowest = Infinity;
   for (const seg of segs) {
     const { from: a, to: b } = seg;

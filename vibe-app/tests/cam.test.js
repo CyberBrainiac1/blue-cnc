@@ -102,3 +102,33 @@ test('a handful of fresh random parts', () => {
     assert.notEqual(r.outcome, 'fail', `seed ${seed}: ${(r.problems || []).join('\n')}`);
   }
 });
+
+test('a job starts from the back right corner, pauses over the stock to zero Z, and fits between the stock spot and the corner', () => {
+  const plate = readPlate(fixture('z_motor_plate'));
+  const job = makeToolpaths(plate, settingsFor('wood', 'quarter'), TEAM_MACHINE);
+  const start = job.lines.indexOf('G54');
+  assert.deepEqual(job.lines.slice(start - 1, start + 7), [
+    'G21 G90 G17 G94', 'G54', 'G10 L20 P1 X380 Y560', 'G0 X10 Y10',
+    '(Zero Z here: lower the bit onto the top of the stock, zero Z, then resume)', 'M6 T1', 'G0 Z10', `M3 S${job.settings.rpm}`,
+  ]);
+  assert.deepEqual(checkJob(job, plate, TEAM_MACHINE), []);
+  // too close to the corner for this plate
+  const tight = { ...TEAM_MACHINE, corner: { on: true, x: 60, y: 560 } };
+  assert.throws(() => makeToolpaths(plate, settingsFor('wood', 'quarter'), tight), e => e instanceof CamError && /stock spot/.test(e.message));
+  // with the corner start off, nothing is added
+  const off = makeToolpaths(plate, settingsFor('wood', 'quarter'), { ...TEAM_MACHINE, corner: { on: false, x: 380, y: 560 } });
+  assert.ok(!off.lines.includes('G54') && !off.lines.some(l => /^M6/.test(l)));
+});
+
+test('thicker stock is cut right through, thinner stock is refused', () => {
+  const plate = readPlate(fixture('z_motor_plate'));
+  const base = makeToolpaths(plate, settingsFor('wood', 'quarter'), TEAM_MACHINE);
+  const deepest = job => Math.min(...job.lines.flatMap(l => (l.match(/Z(-[\d.]+)/) ? [+l.match(/Z(-[\d.]+)/)[1]] : [])));
+  const thick = makeToolpaths(plate, { ...settingsFor('wood', 'quarter'), stock: plate.thickness + 3 }, TEAM_MACHINE);
+  assert.ok(Math.abs(deepest(thick) - (deepest(base) - 3)) < 1e-6, 'the through cuts go 3 mm deeper');
+  assert.equal(thick.thickness, plate.thickness + 3);
+  assert.ok(thick.warnings.some(w => /comes out/.test(w)));
+  const same = makeToolpaths(plate, { ...settingsFor('wood', 'quarter'), stock: plate.thickness }, TEAM_MACHINE);
+  assert.deepEqual(same.lines, base.lines);
+  assert.throws(() => makeToolpaths(plate, { ...settingsFor('wood', 'quarter'), stock: plate.thickness - 2 }, TEAM_MACHINE), e => e instanceof CamError && /thinner/.test(e.message));
+});
