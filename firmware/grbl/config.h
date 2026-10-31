@@ -210,6 +210,9 @@
 // uncomment the config option USE_SPINDLE_DIR_AS_ENABLE_PIN below.
 #define INVERT_SPINDLE_ENABLE_PIN // Enabled: the JP-3163B relay on DB25 hole 1 turns on when the pin is low
 
+// Inverts the spindle PWM pin (D11): full duty becomes 0% and the pin idles high when the PWM is off.
+#define INVERT_SPINDLE_PWM_PIN // Enabled: the JP-3163B's 0-10V output (DB25 hole 17) is 10 V when the pin is low
+
 // Inverts the selected coolant pin from low-disabled/high-enabled to low-enabled/high-disabled. Useful
 // for some pre-built electronic boards.
 // #define INVERT_COOLANT_FLOOD_PIN // Default disabled. Uncomment to enable.
